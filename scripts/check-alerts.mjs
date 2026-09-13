@@ -1,16 +1,12 @@
 // Standalone restock checker for GitHub Actions (no build step, uses Node's global fetch).
 // Mirrors lib/popmart.ts, then diffs against data/hirono-state.json and sends a
-// WhatsApp message (via the official Meta WhatsApp Cloud API) for any Hirono
-// product that transitions into stock.
+// Telegram message for any Hirono product that transitions into stock.
 //
-// Env (all from the Meta WhatsApp > API Setup page):
-//   WA_TOKEN     (required)  access token (use a permanent System User token for the cron)
-//   WA_PHONE_ID  (required)  the sender "Phone number ID"
-//   WA_TO        (required)  your WhatsApp number, digits only incl. country code (e.g. 639954290741)
-//   WA_TEMPLATE  (optional)  approved template name for restocks; default "restock_alert"
-//   WA_LANG      (optional)  template language code; default "en_US"
-//   ALERT_KEYWORD(optional)  default "hirono"
-//   STATE_FILE   (optional)  default data/hirono-state.json
+// Env:
+//   TELEGRAM_BOT_TOKEN (required)  BotFather token
+//   TELEGRAM_CHAT_ID   (required)  your chat id
+//   ALERT_KEYWORD      (optional)  default "hirono"
+//   STATE_FILE         (optional)  default data/hirono-state.json
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -19,11 +15,8 @@ const API_BASE = "https://prod-apac-api.popmart.com";
 const AREA = "PH";
 const KEYWORD = process.env.ALERT_KEYWORD || "hirono";
 const STATE_FILE = process.env.STATE_FILE || "data/hirono-state.json";
-const WA_TOKEN = process.env.WA_TOKEN;
-const WA_PHONE_ID = process.env.WA_PHONE_ID;
-const WA_TO = process.env.WA_TO;
-const WA_TEMPLATE = process.env.WA_TEMPLATE || "restock_alert";
-const WA_LANG = process.env.WA_LANG || "en_US";
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
 
 const HEADERS = {
   "content-type": "application/json",
@@ -111,49 +104,28 @@ async function saveState(map) {
   await writeFile(STATE_FILE, JSON.stringify(map, null, 2) + "\n", "utf8");
 }
 
-// Send a WhatsApp template message via the official Meta Cloud API.
-// Template messages can be delivered proactively (no 24h-window restriction).
-async function sendTemplate(name, params = [], lang = WA_LANG) {
-  if (!WA_TOKEN || !WA_PHONE_ID || !WA_TO) {
-    console.log(
-      `[dry-run] no WhatsApp creds; would send template "${name}" with params:`,
-      params,
-    );
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Send a Telegram message. Proactive sends are unrestricted once you've messaged the bot.
+async function sendTelegram(text) {
+  if (!TG_TOKEN || !TG_CHAT) {
+    console.log("[dry-run] no Telegram creds; would send:\n" + text);
     return;
   }
-  const payload = {
-    messaging_product: "whatsapp",
-    to: WA_TO,
-    type: "template",
-    template: {
-      name,
-      language: { code: lang },
-      ...(params.length
-        ? {
-            components: [
-              {
-                type: "body",
-                parameters: params.map((text) => ({ type: "text", text })),
-              },
-            ],
-          }
-        : {}),
-    },
-  };
-  const res = await fetch(
-    `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${WA_TOKEN}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-  const body = await res.text();
-  if (!res.ok) console.error("WhatsApp send failed:", res.status, body.slice(0, 300));
-  else console.log("WhatsApp sent:", name);
+  const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: TG_CHAT,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+    }),
+  });
+  if (!res.ok) console.error("Telegram send failed:", res.status, await res.text());
+  else console.log("Telegram sent.");
 }
 
 async function main() {
@@ -161,17 +133,17 @@ async function main() {
   const prev = await loadState();
   const nextState = Object.fromEntries(products.map((p) => [p.id, p.availability]));
 
-  // First ever run: establish baseline, no per-item spam. Confirm via the
-  // pre-approved hello_world template (works immediately, no approval wait).
+  // First ever run: establish baseline, no per-item spam.
   if (!prev) {
     await saveState(nextState);
     const afterDark = products.filter((p) => p.isAfterDark);
     const adIn = afterDark.filter((p) => p.availability === "in_stock").length;
-    console.log(
-      `Baseline: ${products.length} Hirono products, After Dark ${adIn}/${afterDark.length} in stock.`,
+    await sendTelegram(
+      `🤖 <b>Popmart Sentry</b> is now watching <b>${products.length}</b> Hirono products on Pop Mart PH.\n` +
+        `⭐ After Dark: ${adIn}/${afterDark.length} in stock right now.\n` +
+        `You'll get a ping the moment anything restocks.`,
     );
-    await sendTemplate("hello_world");
-    console.log("Baseline saved; startup confirmation sent.");
+    console.log("Baseline saved; startup message sent.");
     return;
   }
 
@@ -183,15 +155,15 @@ async function main() {
   restocked.sort((a, b) => Number(b.isAfterDark) - Number(a.isAfterDark));
 
   for (const p of restocked) {
-    const flag = p.isAfterDark ? "⭐ AFTER DARK: " : "";
-    // Template body params: {{1}} product, {{2}} price · stock, {{3}} url
-    await sendTemplate(WA_TEMPLATE, [
-      `${flag}${p.name}`,
-      `${peso(p.price)} · ${p.stock} left`,
-      p.url,
-    ]);
+    const flag = p.isAfterDark ? "⭐ <b>AFTER DARK</b> " : "";
+    await sendTelegram(
+      `🟢 <b>RESTOCK — Pop Mart PH</b>\n` +
+        `${flag}${esc(p.name)}\n` +
+        `${peso(p.price)} · ${p.stock} left\n` +
+        `${p.url}`,
+    );
     console.log("Alerted restock:", p.name);
-    await sleep(2000);
+    await sleep(1500);
   }
 
   const changed = JSON.stringify(prev) !== JSON.stringify(nextState);

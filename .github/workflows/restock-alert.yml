@@ -24,13 +24,10 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Scan Pop Mart PH and send WhatsApp alerts
+      - name: Scan Pop Mart PH and send Telegram alerts
         env:
-          WA_TOKEN: ${{ secrets.WA_TOKEN }}
-          WA_PHONE_ID: ${{ secrets.WA_PHONE_ID }}
-          WA_TO: ${{ secrets.WA_TO }}
-          WA_TEMPLATE: restock_alert
-          WA_LANG: en_US
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ALERT_KEYWORD: hirono
         run: node scripts/check-alerts.mjs
 
