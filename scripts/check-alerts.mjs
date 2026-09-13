@@ -61,52 +61,62 @@ async function scan() {
 
   const products = [];
   for (const it of items) {
-    let availability = "unknown";
-    let stock = 0;
+    let variants = [];
+    let upcoming = false;
     try {
       const d = await rpc("ec/spu/public_FindOne", { id: it.id, channel: "shop" });
-      const skuIds = (d?.skus ?? []).map((s) => s.id);
-      // Live, real-time stock — same call the storefront's buy button uses.
-      let live = -1;
-      if (skuIds.length) {
-        try {
-          const gs = await rpc("ec/spu/getStock", {
-            spuId: it.id,
-            skuIds,
-            type: it.type === "draw" ? "draw" : "normal",
-          });
-          live = Object.values(gs?.stock ?? {}).reduce(
-            (s, n) => s + (Number(n) || 0),
-            0,
-          );
-        } catch {
-          live = -1;
-        }
-      }
-      const fallback =
-        typeof d?.indexData?.remainStock === "number"
-          ? d.indexData.remainStock
-          : (d?.skus ?? []).reduce((s, k) => s + (Number(k.tmpStock) || 0), 0);
-      stock = live >= 0 ? live : fallback;
       const now = d?.currentTimestamp ?? Date.now();
       const start = d?.saleStartAt ? Date.parse(d.saleStartAt) : 0;
-      if (!d?.publish || !d?.show) availability = "unknown";
-      else if (start && start > now) availability = "upcoming";
-      else availability = stock > 0 ? "in_stock" : "sold_out";
-    } catch {
-      availability = "unknown";
-    }
+      upcoming = !!(start && start > now) || !d?.publish || !d?.show;
+
+      if (it.type === "draw") {
+        try {
+          const as = await rpc("draw/set/public_assignSet", { spuId: it.id });
+          const avail = (as?.boxes ?? []).filter((b) => b.status === "available").length;
+          variants = [{ skuId: it.id, name: "Blind box draw", stock: avail }];
+        } catch {}
+      } else {
+        const skus = d?.skus ?? [];
+        if (skus.length) {
+          try {
+            const gs = await rpc("ec/spu/getStock", {
+              spuId: it.id,
+              skuIds: skus.map((s) => s.id),
+              type: "normal",
+            });
+            const stock = gs?.stock ?? {};
+            variants = skus.map((s) => ({
+              skuId: s.id,
+              name: s.name_trans?.en || s.name_trans?.["en-us"] || "Standard",
+              stock: Number(stock[s.id]) || 0,
+            }));
+          } catch {}
+        }
+      }
+    } catch {}
     products.push({
       id: it.id,
       name: it.name,
       price: it.price,
-      stock,
-      availability,
       isAfterDark: /after\s*dark/i.test(it.name),
       url: `https://www.popmart.com/en-PH/products/${it.slugTitle ?? ""}/${it.id}`,
+      upcoming,
+      variants, // [{skuId, name, stock}]
     });
   }
   return products;
+}
+
+// Per-variant availability keyed by skuId: "in_stock" | "sold_out".
+function variantStates(products) {
+  const map = {};
+  for (const p of products) {
+    if (p.upcoming) continue;
+    for (const v of p.variants) {
+      map[v.skuId] = v.stock > 0 ? "in_stock" : "sold_out";
+    }
+  }
+  return map;
 }
 
 async function loadState() {
@@ -148,14 +158,16 @@ async function sendTelegram(text) {
 
 async function main() {
   const products = await scan();
-  const prev = await loadState();
-  const nextState = Object.fromEntries(products.map((p) => [p.id, p.availability]));
+  const prev = await loadState(); // { skuId: "in_stock" | "sold_out" }
+  const nextState = variantStates(products);
+
+  const inStock = (p) => p.variants.some((v) => v.stock > 0);
 
   // First ever run: establish baseline, no per-item spam.
   if (!prev) {
     await saveState(nextState);
     const afterDark = products.filter((p) => p.isAfterDark);
-    const adIn = afterDark.filter((p) => p.availability === "in_stock").length;
+    const adIn = afterDark.filter(inStock).length;
     await sendTelegram(
       `🤖 <b>Popmart Sentry</b> is now watching <b>${products.length}</b> Hirono products on Pop Mart PH.\n` +
         `⭐ After Dark: ${adIn}/${afterDark.length} in stock right now.\n` +
@@ -165,29 +177,36 @@ async function main() {
     return;
   }
 
-  const restocked = products.filter(
-    (p) => prev[p.id] && prev[p.id] !== "in_stock" && p.availability === "in_stock",
-  );
-
+  // Collect per-variant transitions into stock.
+  const events = [];
+  for (const p of products) {
+    if (p.upcoming) continue;
+    for (const v of p.variants) {
+      const now = v.stock > 0 ? "in_stock" : "sold_out";
+      const before = prev[v.skuId];
+      if (before && before !== "in_stock" && now === "in_stock") events.push({ p, v });
+    }
+  }
   // After Dark first so the important ones lead.
-  restocked.sort((a, b) => Number(b.isAfterDark) - Number(a.isAfterDark));
+  events.sort((a, b) => Number(b.p.isAfterDark) - Number(a.p.isAfterDark));
 
-  for (const p of restocked) {
+  for (const { p, v } of events) {
     const flag = p.isAfterDark ? "⭐ <b>AFTER DARK</b> " : "";
+    const variantLine = p.variants.length > 1 ? `\n<b>${esc(v.name)}</b>` : "";
     await sendTelegram(
       `🟢 <b>RESTOCK — Pop Mart PH</b>\n` +
-        `${flag}${esc(p.name)}\n` +
-        `${peso(p.price)} · ${p.stock} left\n` +
+        `${flag}${esc(p.name)}${variantLine}\n` +
+        `${peso(p.price)} · ${v.stock} left\n` +
         `${p.url}`,
     );
-    console.log("Alerted restock:", p.name);
+    console.log("Alerted restock:", p.name, p.variants.length > 1 ? `(${v.name})` : "");
     await sleep(1500);
   }
 
   const changed = JSON.stringify(prev) !== JSON.stringify(nextState);
   if (changed) await saveState(nextState);
   console.log(
-    `Scan done. ${products.length} products, ${restocked.length} restock alert(s), state ${
+    `Scan done. ${products.length} products, ${events.length} restock alert(s), state ${
       changed ? "updated" : "unchanged"
     }.`,
   );

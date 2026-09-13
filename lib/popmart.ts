@@ -57,6 +57,15 @@ export interface Sku {
   id: string;
   tmpStock: number;
   price: number;
+  name_trans?: Record<string, string>;
+}
+
+/** One buyable option of a product (e.g. "Patchwork - iPhone 17 Pro Max", or a draw's boxes). */
+export interface Variant {
+  skuId: string;
+  name: string;
+  stock: number;
+  availability: Extract<Availability, "in_stock" | "sold_out" | "unknown">;
 }
 
 export interface SpuDetail {
@@ -89,8 +98,10 @@ export interface Product {
   series: string;
   isAfterDark: boolean;
   availability: Availability;
-  /** Total sellable units across SKUs (Pop Mart's tmpStock). */
+  /** Total live sellable units across all variants. */
   stock: number;
+  /** Per-variant breakdown (always ≥1 entry). Multi-entry = size/model options. */
+  variants: Variant[];
   saleStartAt: string | null;
   sales: number | null;
 }
@@ -135,44 +146,56 @@ function deriveSeries(name: string): string {
   return "Other";
 }
 
-// Live, real-time purchasable stock — the same call the storefront's buy button uses.
-// Returns total units across SKUs, or -1 if the call failed (treat as unknown).
-async function getLiveStock(
+const skuName = (s: Sku): string =>
+  s.name_trans?.["en"] || s.name_trans?.["en-us"] || "Standard";
+
+// Live per-SKU stock — the same getStock call the storefront's buy button uses.
+// Returns { skuId: units }, or null if the call failed (treat as unknown).
+async function getNormalStock(
   spuId: string,
-  skuIds: string[],
-  type: string,
-): Promise<number> {
-  if (skuIds.length === 0) return -1;
+  skus: Sku[],
+): Promise<Variant[] | null> {
+  if (skus.length === 0) return null;
   try {
     const res = await rpc<{ stock: Record<string, number> }>("ec/spu/getStock", {
       spuId,
-      skuIds,
-      type: type === "draw" ? "draw" : "normal",
+      skuIds: skus.map((s) => s.id),
+      type: "normal",
     });
-    return Object.values(res?.stock ?? {}).reduce(
-      (sum, n) => sum + (Number(n) || 0),
-      0,
-    );
+    const stock = res?.stock ?? {};
+    return skus.map((s) => {
+      const units = Number(stock[s.id]) || 0;
+      return {
+        skuId: s.id,
+        name: skuName(s),
+        stock: units,
+        availability: units > 0 ? "in_stock" : "sold_out",
+      } as Variant;
+    });
   } catch {
-    return -1;
+    return null;
   }
 }
 
-function classify(
-  detail: SpuDetail,
-  liveStock: number,
-): { availability: Availability; stock: number } {
-  // Prefer live getStock; fall back to FindOne's cached fields only if it failed.
-  const fallback =
-    typeof detail.indexData?.remainStock === "number"
-      ? detail.indexData.remainStock
-      : (detail.skus ?? []).reduce((sum, s) => sum + (Number(s.tmpStock) || 0), 0);
-  const stock = liveStock >= 0 ? liveStock : fallback;
-  const now = detail.currentTimestamp ?? Date.now();
-  const start = detail.saleStartAt ? Date.parse(detail.saleStartAt) : 0;
-  if (!detail.publish || !detail.show) return { availability: "unknown", stock };
-  if (start && start > now) return { availability: "upcoming", stock };
-  return { availability: stock > 0 ? "in_stock" : "sold_out", stock };
+// Live stock for a "draw" (Pop Now / pick-a-box) product: how many boxes in the
+// assigned set are still available. Empty set => sold out. null if the call failed.
+async function getDrawStock(spuId: string): Promise<Variant | null> {
+  try {
+    const res = await rpc<{ boxes?: { status: string }[] }>(
+      "draw/set/public_assignSet",
+      { spuId },
+    );
+    const available = (res?.boxes ?? []).filter((b) => b.status === "available")
+      .length;
+    return {
+      skuId: spuId,
+      name: "Blind box draw",
+      stock: available,
+      availability: available > 0 ? "in_stock" : "sold_out",
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Full scan: list every Hirono product and resolve live stock for each. */
@@ -193,7 +216,7 @@ export async function scanHirono(keyword = "hirono"): Promise<ScanResult> {
         const isAfterDark = /after\s*dark/i.test(name);
         const slug = it.slugTitle ?? "";
         let availability: Availability = "unknown";
-        let stock = 0;
+        let variants: Variant[] = [];
         let saleStartAt: string | null = it.saleStartAt ?? null;
         let sales: number | null = null;
         try {
@@ -201,16 +224,31 @@ export async function scanHirono(keyword = "hirono"): Promise<ScanResult> {
             id: it.id,
             channel: "shop",
           });
-          const skuIds = (detail.skus ?? []).map((s) => s.id);
-          const live = await getLiveStock(it.id, skuIds, it.type);
-          const c = classify(detail, live);
-          availability = c.availability;
-          stock = c.stock;
           saleStartAt = detail.saleStartAt ?? saleStartAt;
           sales = typeof detail.sales === "number" ? detail.sales : null;
+
+          // Resolve live per-variant stock (draw items use a different endpoint).
+          if (it.type === "draw") {
+            const v = await getDrawStock(it.id);
+            variants = v ? [v] : [];
+          } else {
+            const v = await getNormalStock(it.id, detail.skus ?? []);
+            variants = v ?? [];
+          }
+
+          const now = detail.currentTimestamp ?? Date.now();
+          const start = detail.saleStartAt ? Date.parse(detail.saleStartAt) : 0;
+          if (!detail.publish || !detail.show) availability = "unknown";
+          else if (start && start > now) availability = "upcoming";
+          else if (variants.length === 0) availability = "unknown";
+          else
+            availability = variants.some((v) => v.availability === "in_stock")
+              ? "in_stock"
+              : "sold_out";
         } catch {
           availability = "unknown";
         }
+        const stock = variants.reduce((sum, v) => sum + v.stock, 0);
         return {
           id: it.id,
           name,
@@ -226,6 +264,7 @@ export async function scanHirono(keyword = "hirono"): Promise<ScanResult> {
           isAfterDark,
           availability,
           stock,
+          variants,
           saleStartAt,
           sales,
         };

@@ -349,13 +349,43 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           )}
           {p.type === "draw" && (
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              DRAW
+              POP NOW
             </span>
           )}
         </div>
         <h3 className="line-clamp-2 text-sm font-medium text-zinc-100">
           {p.name}
         </h3>
+
+        {p.variants.length > 1 && (
+          <ul className="mt-2 space-y-1">
+            {p.variants.map((v) => (
+              <li
+                key={v.skuId}
+                className="flex items-center justify-between gap-2 text-xs"
+              >
+                <span className="flex items-center gap-1.5 text-zinc-300">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      v.availability === "in_stock" ? "bg-emerald-400" : "bg-rose-400"
+                    }`}
+                  />
+                  {v.name}
+                </span>
+                <span
+                  className={
+                    v.availability === "in_stock"
+                      ? "text-emerald-300"
+                      : "text-zinc-500"
+                  }
+                >
+                  {v.availability === "in_stock" ? `${v.stock} left` : "sold out"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <div className="mt-auto flex items-center justify-between pt-2">
           <span className="text-sm font-semibold text-zinc-200">
             {peso.format(p.price)}
