@@ -135,13 +135,39 @@ function deriveSeries(name: string): string {
   return "Other";
 }
 
-function classify(detail: SpuDetail): { availability: Availability; stock: number } {
-  // Prefer indexData.remainStock (true units left); fall back to summing SKU tmpStock.
-  const remain = detail.indexData?.remainStock;
-  const stock =
-    typeof remain === "number"
-      ? remain
+// Live, real-time purchasable stock — the same call the storefront's buy button uses.
+// Returns total units across SKUs, or -1 if the call failed (treat as unknown).
+async function getLiveStock(
+  spuId: string,
+  skuIds: string[],
+  type: string,
+): Promise<number> {
+  if (skuIds.length === 0) return -1;
+  try {
+    const res = await rpc<{ stock: Record<string, number> }>("ec/spu/getStock", {
+      spuId,
+      skuIds,
+      type: type === "draw" ? "draw" : "normal",
+    });
+    return Object.values(res?.stock ?? {}).reduce(
+      (sum, n) => sum + (Number(n) || 0),
+      0,
+    );
+  } catch {
+    return -1;
+  }
+}
+
+function classify(
+  detail: SpuDetail,
+  liveStock: number,
+): { availability: Availability; stock: number } {
+  // Prefer live getStock; fall back to FindOne's cached fields only if it failed.
+  const fallback =
+    typeof detail.indexData?.remainStock === "number"
+      ? detail.indexData.remainStock
       : (detail.skus ?? []).reduce((sum, s) => sum + (Number(s.tmpStock) || 0), 0);
+  const stock = liveStock >= 0 ? liveStock : fallback;
   const now = detail.currentTimestamp ?? Date.now();
   const start = detail.saleStartAt ? Date.parse(detail.saleStartAt) : 0;
   if (!detail.publish || !detail.show) return { availability: "unknown", stock };
@@ -175,7 +201,9 @@ export async function scanHirono(keyword = "hirono"): Promise<ScanResult> {
             id: it.id,
             channel: "shop",
           });
-          const c = classify(detail);
+          const skuIds = (detail.skus ?? []).map((s) => s.id);
+          const live = await getLiveStock(it.id, skuIds, it.type);
+          const c = classify(detail, live);
           availability = c.availability;
           stock = c.stock;
           saleStartAt = detail.saleStartAt ?? saleStartAt;

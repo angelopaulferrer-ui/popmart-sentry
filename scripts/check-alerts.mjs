@@ -65,11 +65,29 @@ async function scan() {
     let stock = 0;
     try {
       const d = await rpc("ec/spu/public_FindOne", { id: it.id, channel: "shop" });
-      const remain = d?.indexData?.remainStock;
-      stock =
-        typeof remain === "number"
-          ? remain
+      const skuIds = (d?.skus ?? []).map((s) => s.id);
+      // Live, real-time stock — same call the storefront's buy button uses.
+      let live = -1;
+      if (skuIds.length) {
+        try {
+          const gs = await rpc("ec/spu/getStock", {
+            spuId: it.id,
+            skuIds,
+            type: it.type === "draw" ? "draw" : "normal",
+          });
+          live = Object.values(gs?.stock ?? {}).reduce(
+            (s, n) => s + (Number(n) || 0),
+            0,
+          );
+        } catch {
+          live = -1;
+        }
+      }
+      const fallback =
+        typeof d?.indexData?.remainStock === "number"
+          ? d.indexData.remainStock
           : (d?.skus ?? []).reduce((s, k) => s + (Number(k.tmpStock) || 0), 0);
+      stock = live >= 0 ? live : fallback;
       const now = d?.currentTimestamp ?? Date.now();
       const start = d?.saleStartAt ? Date.parse(d.saleStartAt) : 0;
       if (!d?.publish || !d?.show) availability = "unknown";
