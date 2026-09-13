@@ -1,11 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  /* Hirono sketchbook palette */
+  --paper: #ece2ce;
+  --paper-card: #f6efdf;
+  --ink: #1c1917;
 }
 
 html,
 body {
-  background: #0b0b12;
-  color: #e7e7ee;
+  background-color: var(--paper);
+  color: var(--ink);
+  /* subtle aged-paper vignette */
+  background-image: radial-gradient(
+    120% 120% at 50% 0%,
+    #f2ead7 0%,
+    #ece2ce 55%,
+    #e3d7bd 100%
+  );
+  background-attachment: fixed;
 }

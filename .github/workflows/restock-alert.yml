@@ -1,12 +1,12 @@
 name: Restock alerts (Hirono / After Dark)
 
+# GitHub's scheduler floor is 5 min, so to poll every ~2 min we trigger every
+# 6 min and loop 3 checks (t=0,2,4) inside one job. Public repo => free Actions.
 on:
   schedule:
-    # Every 5 minutes (GitHub's minimum). Runs may be delayed under load.
-    - cron: "*/5 * * * *"
-  workflow_dispatch: {} # allow manual "Run workflow" for testing
+    - cron: "*/6 * * * *"
+  workflow_dispatch: {}
 
-# Needed so the job can commit the updated state file back.
 permissions:
   contents: write
 
@@ -17,28 +17,36 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
-      - name: Scan Pop Mart PH and send Telegram alerts
+      - name: Poll Pop Mart PH every 2 minutes
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ALERT_KEYWORD: hirono
-        run: node scripts/check-alerts.mjs
+        run: |
+          for i in 1 2 3; do
+            echo "::group::check $i"
+            node scripts/check-alerts.mjs || true
+            echo "::endgroup::"
+            [ "$i" -lt 3 ] && sleep 120
+          done
 
       - name: Commit state changes (if any)
         run: |
           if [[ -n "$(git status --porcelain data/hirono-state.json)" ]]; then
             git config user.name "popmart-sentry-bot"
             git config user.email "bot@users.noreply.github.com"
+            git pull --no-edit --no-rebase origin main || true
             git add data/hirono-state.json
-            git commit -m "chore: update stock state [skip ci]"
-            git push
+            git commit -m "chore: update stock state [skip ci]" || true
+            git push || true
           else
             echo "No state change."
           fi

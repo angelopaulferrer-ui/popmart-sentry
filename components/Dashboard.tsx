@@ -32,27 +32,27 @@ const AVAIL_META: Record<
 > = {
   in_stock: {
     label: "In stock",
-    dot: "bg-emerald-400",
-    text: "text-emerald-300",
-    ring: "ring-emerald-500/30",
+    dot: "bg-emerald-600",
+    text: "text-emerald-800",
+    ring: "ring-emerald-700/30",
   },
   sold_out: {
     label: "Sold out",
-    dot: "bg-rose-400",
-    text: "text-rose-300",
-    ring: "ring-rose-500/20",
+    dot: "bg-rose-600",
+    text: "text-rose-800",
+    ring: "ring-rose-700/25",
   },
   upcoming: {
     label: "Upcoming",
-    dot: "bg-amber-400",
-    text: "text-amber-300",
-    ring: "ring-amber-500/20",
+    dot: "bg-amber-500",
+    text: "text-amber-800",
+    ring: "ring-amber-700/25",
   },
   unknown: {
     label: "Unknown",
-    dot: "bg-zinc-500",
-    text: "text-zinc-400",
-    ring: "ring-zinc-500/20",
+    dot: "bg-stone-500",
+    text: "text-stone-600",
+    ring: "ring-stone-500/25",
   },
 };
 
@@ -165,17 +165,17 @@ export default function Dashboard({
             alt="Hirono"
             width={52}
             height={52}
-            className="h-13 w-13 shrink-0 rounded-xl ring-1 ring-white/10"
+            className="h-13 w-13 shrink-0 rounded-xl ring-1 ring-stone-900/15"
             style={{ height: 52, width: 52 }}
           />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
               Popmart Sentry
-              <span className="ml-2 rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-xs font-medium text-fuchsia-300 ring-1 ring-fuchsia-500/30">
+              <span className="ml-2 rounded-full bg-stone-900/10 px-2 py-0.5 text-xs font-medium text-stone-800 ring-1 ring-stone-900/25">
                 Hirono · PH
               </span>
             </h1>
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm text-stone-600">
             Live availability from popmart.com/ph ·{" "}
             {data ? (
               <>
@@ -192,12 +192,12 @@ export default function Dashboard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 rounded-lg bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-white/10">
+          <label className="flex items-center gap-2 rounded-lg bg-[#e7dcc4] px-3 py-1.5 text-sm text-stone-700 ring-1 ring-stone-900/15">
             <input
               type="checkbox"
               checked={auto}
               onChange={(e) => setAuto(e.target.checked)}
-              className="accent-fuchsia-500"
+              className="accent-stone-800"
             />
             Auto-refresh (60s)
           </label>
@@ -205,8 +205,8 @@ export default function Dashboard({
             onClick={enableAlerts}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 transition ${
               alertsOn
-                ? "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30"
-                : "bg-zinc-800/60 text-zinc-300 ring-white/10 hover:bg-zinc-700/60"
+                ? "bg-emerald-500/15 text-emerald-800 ring-emerald-500/30"
+                : "bg-[#e7dcc4] text-stone-700 ring-stone-900/15 hover:bg-[#dccbac]"
             }`}
           >
             {alertsOn ? "🔔 Alerts on" : "Enable restock alerts"}
@@ -214,7 +214,7 @@ export default function Dashboard({
           <button
             onClick={refresh}
             disabled={loading}
-            className="rounded-lg bg-fuchsia-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
+            className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:opacity-50"
           >
             {loading ? "Scanning…" : "Refresh now"}
           </button>
@@ -222,7 +222,7 @@ export default function Dashboard({
       </header>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/30">
+        <div className="mb-4 rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-500/30">
           Couldn’t reach Pop Mart: {error}
         </div>
       )}
@@ -251,7 +251,7 @@ export default function Dashboard({
           value={scope}
           onChange={(v) => setScope(v as ScopeFilter)}
         />
-        <span className="mx-1 h-5 w-px bg-white/10" />
+        <span className="mx-1 h-5 w-px bg-stone-900/15" />
         <Segment
           options={[
             { k: "all", label: "Any" },
@@ -263,13 +263,13 @@ export default function Dashboard({
           value={avail}
           onChange={(v) => setAvail(v as AvailFilter)}
         />
-        <span className="ml-auto text-sm text-zinc-500">
+        <span className="ml-auto text-sm text-stone-500">
           {filtered.length} shown
         </span>
       </div>
 
       {data && filtered.length === 0 && (
-        <p className="rounded-lg bg-zinc-800/40 px-4 py-8 text-center text-sm text-zinc-400">
+        <p className="rounded-lg bg-[#e7dcc4]/60 px-4 py-8 text-center text-sm text-stone-600">
           No products match this filter.
         </p>
       )}
@@ -280,7 +280,7 @@ export default function Dashboard({
         ))}
       </div>
 
-      <footer className="mt-10 text-center text-xs text-zinc-600">
+      <footer className="mt-10 text-center text-xs text-stone-500">
         Unofficial monitor. Stock reflects Pop Mart’s reported inventory and may
         lag the live cart.
       </footer>
@@ -298,16 +298,16 @@ function Stat({
   tone?: "zinc" | "emerald" | "rose" | "amber" | "fuchsia";
 }) {
   const tones: Record<string, string> = {
-    zinc: "text-zinc-100",
-    emerald: "text-emerald-300",
-    rose: "text-rose-300",
-    amber: "text-amber-300",
-    fuchsia: "text-fuchsia-300",
+    zinc: "text-stone-900",
+    emerald: "text-emerald-800",
+    rose: "text-rose-800",
+    amber: "text-amber-800",
+    fuchsia: "text-stone-800",
   };
   return (
-    <div className="rounded-xl bg-zinc-900/70 p-4 ring-1 ring-white/5">
+    <div className="rounded-xl bg-[#f6efdf] p-4 ring-1 ring-stone-900/10">
       <div className={`text-2xl font-bold ${tones[tone]}`}>{value}</div>
-      <div className="mt-0.5 text-xs text-zinc-400">{label}</div>
+      <div className="mt-0.5 text-xs text-stone-600">{label}</div>
     </div>
   );
 }
@@ -322,15 +322,15 @@ function Segment<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg bg-zinc-800/60 p-0.5 ring-1 ring-white/10">
+    <div className="inline-flex rounded-lg bg-[#e7dcc4] p-0.5 ring-1 ring-stone-900/15">
       {options.map((o) => (
         <button
           key={o.k}
           onClick={() => onChange(o.k)}
           className={`rounded-md px-3 py-1 text-sm font-medium transition ${
             value === o.k
-              ? "bg-fuchsia-600 text-white"
-              : "text-zinc-300 hover:text-white"
+              ? "bg-stone-900 text-white"
+              : "text-stone-700 hover:text-white"
           }`}
         >
           {o.label}
@@ -347,12 +347,12 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
       href={p.url}
       target="_blank"
       rel="noreferrer"
-      className={`group relative flex flex-col overflow-hidden rounded-xl bg-zinc-900/70 ring-1 transition hover:ring-fuchsia-500/40 ${
-        p.isAfterDark ? "ring-fuchsia-500/30" : "ring-white/5"
+      className={`group relative flex flex-col overflow-hidden rounded-xl bg-[#f6efdf] ring-1 transition hover:ring-stone-900/35 ${
+        p.isAfterDark ? "ring-stone-900/25" : "ring-stone-900/10"
       }`}
     >
       {p.isAfterDark && (
-        <span className="absolute left-2 top-2 z-10 rounded-full bg-fuchsia-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+        <span className="absolute left-2 top-2 z-10 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
           After Dark
         </span>
       )}
@@ -367,7 +367,7 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           </span>
         )
       )}
-      <div className="aspect-square w-full overflow-hidden bg-zinc-800">
+      <div className="aspect-square w-full overflow-hidden bg-[#e2d6bd]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={p.image}
@@ -387,19 +387,19 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           {p.availability === "in_stock" && (
             <span
               className={`text-xs ${
-                p.stock <= LOW_STOCK_THRESHOLD ? "font-semibold text-amber-400" : "text-zinc-500"
+                p.stock <= LOW_STOCK_THRESHOLD ? "font-semibold text-amber-700" : "text-stone-500"
               }`}
             >
               {p.stock} left
             </span>
           )}
           {p.type === "draw" && (
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+            <span className="rounded bg-[#e2d6bd] px-1.5 py-0.5 text-[10px] text-stone-600">
               POP NOW
             </span>
           )}
         </div>
-        <h3 className="line-clamp-2 text-sm font-medium text-zinc-100">
+        <h3 className="line-clamp-2 text-sm font-medium text-stone-900">
           {p.name}
         </h3>
 
@@ -410,10 +410,10 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
                 key={v.skuId}
                 className="flex items-center justify-between gap-2 text-xs"
               >
-                <span className="flex items-center gap-1.5 text-zinc-300">
+                <span className="flex items-center gap-1.5 text-stone-700">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      v.availability === "in_stock" ? "bg-emerald-400" : "bg-rose-400"
+                      v.availability === "in_stock" ? "bg-emerald-600" : "bg-rose-600"
                     }`}
                   />
                   {v.name}
@@ -421,10 +421,10 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
                 <span
                   className={
                     v.availability !== "in_stock"
-                      ? "text-zinc-500"
+                      ? "text-stone-500"
                       : isLowVariant(v)
-                        ? "font-semibold text-amber-400"
-                        : "text-emerald-300"
+                        ? "font-semibold text-amber-700"
+                        : "text-emerald-800"
                   }
                 >
                   {v.availability === "in_stock"
@@ -437,10 +437,10 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
         )}
 
         <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="text-sm font-semibold text-zinc-200">
+          <span className="text-sm font-semibold text-stone-800">
             {peso.format(p.price)}
           </span>
-          <span className="text-[11px] text-zinc-500">{p.series}</span>
+          <span className="text-[11px] text-stone-500">{p.series}</span>
         </div>
       </div>
     </a>
