@@ -32,27 +32,27 @@ const AVAIL_META: Record<
 > = {
   in_stock: {
     label: "In stock",
-    dot: "bg-emerald-600",
-    text: "text-emerald-800",
-    ring: "ring-emerald-700/30",
+    dot: "bg-emerald-400",
+    text: "text-emerald-300",
+    ring: "ring-emerald-400/40",
   },
   sold_out: {
     label: "Sold out",
-    dot: "bg-rose-600",
-    text: "text-rose-800",
-    ring: "ring-rose-700/25",
+    dot: "bg-rose-400",
+    text: "text-rose-300",
+    ring: "ring-rose-400/40",
   },
   upcoming: {
     label: "Upcoming",
-    dot: "bg-amber-500",
-    text: "text-amber-800",
-    ring: "ring-amber-700/25",
+    dot: "bg-amber-400",
+    text: "text-amber-300",
+    ring: "ring-amber-400/40",
   },
   unknown: {
     label: "Unknown",
     dot: "bg-stone-500",
-    text: "text-stone-600",
-    ring: "ring-stone-500/25",
+    text: "text-stone-400",
+    ring: "ring-stone-500/40",
   },
 };
 
@@ -376,7 +376,7 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           className="h-full w-full object-cover transition group-hover:scale-105"
         />
       </div>
-      <div className="flex flex-1 flex-col p-3">
+      <div className="flex flex-1 flex-col bg-stone-950 p-3 text-stone-100">
         <div className="mb-1 flex items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${meta.text} ${meta.ring}`}
@@ -387,19 +387,19 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           {p.availability === "in_stock" && (
             <span
               className={`text-xs ${
-                p.stock <= LOW_STOCK_THRESHOLD ? "font-semibold text-amber-700" : "text-stone-500"
+                p.stock <= LOW_STOCK_THRESHOLD ? "font-semibold text-amber-400" : "text-stone-400"
               }`}
             >
               {p.stock} left
             </span>
           )}
           {p.type === "draw" && (
-            <span className="rounded bg-[#e2d6bd] px-1.5 py-0.5 text-[10px] text-stone-600">
+            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-stone-300">
               POP NOW
             </span>
           )}
         </div>
-        <h3 className="line-clamp-2 text-sm font-medium text-stone-900">
+        <h3 className="line-clamp-2 text-sm font-medium text-white">
           {p.name}
         </h3>
 
@@ -410,10 +410,10 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
                 key={v.skuId}
                 className="flex items-center justify-between gap-2 text-xs"
               >
-                <span className="flex items-center gap-1.5 text-stone-700">
+                <span className="flex items-center gap-1.5 text-stone-200">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      v.availability === "in_stock" ? "bg-emerald-600" : "bg-rose-600"
+                      v.availability === "in_stock" ? "bg-emerald-400" : "bg-rose-400"
                     }`}
                   />
                   {v.name}
@@ -421,10 +421,10 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
                 <span
                   className={
                     v.availability !== "in_stock"
-                      ? "text-stone-500"
+                      ? "text-stone-400"
                       : isLowVariant(v)
-                        ? "font-semibold text-amber-700"
-                        : "text-emerald-800"
+                        ? "font-semibold text-amber-400"
+                        : "text-emerald-400"
                   }
                 >
                   {v.availability === "in_stock"
@@ -437,10 +437,10 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
         )}
 
         <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="text-sm font-semibold text-stone-800">
+          <span className="text-sm font-semibold text-white">
             {peso.format(p.price)}
           </span>
-          <span className="text-[11px] text-stone-500">{p.series}</span>
+          <span className="text-[11px] text-stone-400">{p.series}</span>
         </div>
       </div>
     </a>

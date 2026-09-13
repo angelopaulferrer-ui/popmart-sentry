@@ -35,7 +35,7 @@ jobs:
             echo "::group::check $i"
             node scripts/check-alerts.mjs || true
             echo "::endgroup::"
-            [ "$i" -lt 3 ] && sleep 120
+            if [ "$i" -lt 3 ]; then sleep 120; fi
           done
 
       - name: Commit state changes (if any)
