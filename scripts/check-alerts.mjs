@@ -15,6 +15,8 @@ const API_BASE = "https://prod-apac-api.popmart.com";
 const AREA = "PH";
 const KEYWORD = process.env.ALERT_KEYWORD || "hirono";
 const STATE_FILE = process.env.STATE_FILE || "data/hirono-state.json";
+const LOG_FILE = process.env.LOG_FILE || "data/restock-log.json";
+const LOG_MAX = 300;
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
 
@@ -138,6 +140,22 @@ async function saveState(map) {
   await writeFile(STATE_FILE, JSON.stringify(map, null, 2) + "\n", "utf8");
 }
 
+async function loadLog() {
+  try {
+    return JSON.parse(await readFile(LOG_FILE, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+async function appendLog(entries) {
+  if (!entries.length) return;
+  const log = await loadLog();
+  log.unshift(...entries); // newest first
+  await mkdir(dirname(LOG_FILE), { recursive: true });
+  await writeFile(LOG_FILE, JSON.stringify(log.slice(0, LOG_MAX), null, 2) + "\n", "utf8");
+}
+
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -209,6 +227,21 @@ async function main() {
     console.log("Alerted restock:", p.name, p.variants.length > 1 ? `(${v.name})` : "");
     await sleep(1500);
   }
+
+  // Record restock history so the dashboard can show when items came back.
+  const at = new Date().toISOString();
+  await appendLog(
+    events.map(({ p, v }) => ({
+      at,
+      id: p.id,
+      name: p.name,
+      variant: p.variants.length > 1 ? v.name : null,
+      price: (p.price ?? 0) / 100, // store major PHP units for the dashboard
+      stock: v.stock,
+      isAfterDark: p.isAfterDark,
+      url: p.url,
+    })),
+  );
 
   const changed = JSON.stringify(prev) !== JSON.stringify(nextState);
   if (changed) await saveState(nextState);

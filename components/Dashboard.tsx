@@ -59,6 +59,27 @@ const AVAIL_META: Record<
 type ScopeFilter = "all" | "afterdark";
 type AvailFilter = "all" | "low" | Availability;
 
+type RestockEvent = {
+  at: string;
+  id: string;
+  name: string;
+  variant: string | null;
+  price: number;
+  stock: number;
+  isAfterDark: boolean;
+  url: string;
+};
+
+const phTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
 export default function Dashboard({
   initial,
   initialError,
@@ -74,6 +95,9 @@ export default function Dashboard({
   const [auto, setAuto] = useState(true);
   const [alertsOn, setAlertsOn] = useState(false);
   const [restocked, setRestocked] = useState<string[]>([]);
+  const [showLog, setShowLog] = useState(false);
+  const [logEvents, setLogEvents] = useState<RestockEvent[] | null>(null);
+  const [logLoading, setLogLoading] = useState(false);
   const prevAvail = useRef<Map<string, Availability>>(new Map());
 
   // Seed the previous-availability map from the first server render.
@@ -137,6 +161,20 @@ export default function Dashboard({
     if (typeof Notification === "undefined") return;
     const perm = await Notification.requestPermission();
     setAlertsOn(perm === "granted");
+  }, []);
+
+  const openLog = useCallback(async () => {
+    setShowLog(true);
+    setLogLoading(true);
+    try {
+      const r = await fetch("/api/restock-log", { cache: "no-store" });
+      const j = await r.json();
+      setLogEvents(Array.isArray(j.events) ? j.events : []);
+    } catch {
+      setLogEvents([]);
+    } finally {
+      setLogLoading(false);
+    }
   }, []);
 
   const filtered = useMemo(() => {
@@ -212,6 +250,12 @@ export default function Dashboard({
             {alertsOn ? "🔔 Alerts on" : "Enable restock alerts"}
           </button>
           <button
+            onClick={openLog}
+            className="rounded-lg bg-[#e7dcc4] px-3 py-1.5 text-sm font-medium text-stone-700 ring-1 ring-stone-900/15 transition hover:bg-[#dccbac]"
+          >
+            🕒 Restock log
+          </button>
+          <button
             onClick={refresh}
             disabled={loading}
             className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:opacity-50"
@@ -284,7 +328,96 @@ export default function Dashboard({
         Unofficial monitor. Stock reflects Pop Mart’s reported inventory and may
         lag the live cart.
       </footer>
+
+      {showLog && (
+        <RestockLogModal
+          events={logEvents}
+          loading={logLoading}
+          onClose={() => setShowLog(false)}
+        />
+      )}
     </main>
+  );
+}
+
+function RestockLogModal({
+  events,
+  loading,
+  onClose,
+}: {
+  events: RestockEvent[] | null;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-16"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[75vh] w-full max-w-lg overflow-hidden rounded-2xl bg-[#f6efdf] shadow-xl ring-1 ring-stone-900/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-stone-900/10 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-stone-900">🕒 Restock log</h2>
+            <p className="text-xs text-stone-500">
+              When Hirono items came back in stock (PH time)
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-stone-700"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="max-h-[62vh] overflow-y-auto p-3">
+          {loading && <p className="p-6 text-center text-sm text-stone-500">Loading…</p>}
+          {!loading && events && events.length === 0 && (
+            <p className="p-6 text-center text-sm text-stone-500">
+              No restocks logged yet. Once an item comes back in stock, it’ll appear
+              here with the time — so you can spot Pop Mart’s drop patterns.
+            </p>
+          )}
+          {!loading && events && events.length > 0 && (
+            <ul className="space-y-2">
+              {events.map((e, i) => (
+                <li
+                  key={`${e.id}-${e.at}-${i}`}
+                  className="rounded-lg bg-stone-950 p-3 text-stone-100"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-emerald-400">
+                      🟢 Restocked
+                    </span>
+                    <time className="text-xs text-stone-400">{phTime(e.at)}</time>
+                  </div>
+                  <a
+                    href={e.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block text-sm font-medium text-white hover:underline"
+                  >
+                    {e.isAfterDark && (
+                      <span className="mr-1 rounded bg-stone-800 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-300">
+                        After Dark
+                      </span>
+                    )}
+                    {e.name}
+                    {e.variant ? ` — ${e.variant}` : ""}
+                  </a>
+                  <div className="mt-0.5 text-xs text-stone-400">
+                    {peso.format(e.price)} · {e.stock} left at restock
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
