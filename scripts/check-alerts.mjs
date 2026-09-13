@@ -193,10 +193,11 @@ async function main() {
   for (const { p, v } of events) {
     const flag = p.isAfterDark ? "⭐ <b>AFTER DARK</b> " : "";
     const variantLine = p.variants.length > 1 ? `\n<b>${esc(v.name)}</b>` : "";
+    const low = v.stock <= 3 ? "⚡ only " : "";
     await sendTelegram(
       `🟢 <b>RESTOCK — Pop Mart PH</b>\n` +
         `${flag}${esc(p.name)}${variantLine}\n` +
-        `${peso(p.price)} · ${v.stock} left\n` +
+        `${peso(p.price)} · ${low}${v.stock} left\n` +
         `${p.url}`,
     );
     console.log("Alerted restock:", p.name, p.variants.length > 1 ? `(${v.name})` : "");

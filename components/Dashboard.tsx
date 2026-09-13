@@ -5,6 +5,22 @@ import type { ScanResult, Product, Availability } from "@/lib/popmart";
 
 const REFRESH_MS = 60_000;
 
+// Variants with this many units or fewer (but >0) are "running low".
+const LOW_STOCK_THRESHOLD = 3;
+
+const isLowVariant = (v: { stock: number }) =>
+  v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD;
+
+// A product is "low stock" if it's in stock and every available option is running low.
+const isLowStock = (p: Product) => {
+  const inStockVariants = p.variants.filter((v) => v.stock > 0);
+  return (
+    p.availability === "in_stock" &&
+    inStockVariants.length > 0 &&
+    inStockVariants.every(isLowVariant)
+  );
+};
+
 const peso = new Intl.NumberFormat("en-PH", {
   style: "currency",
   currency: "PHP",
@@ -41,7 +57,7 @@ const AVAIL_META: Record<
 };
 
 type ScopeFilter = "all" | "afterdark";
-type AvailFilter = "all" | Availability;
+type AvailFilter = "all" | "low" | Availability;
 
 export default function Dashboard({
   initial,
@@ -127,12 +143,17 @@ export default function Dashboard({
     if (!data) return [];
     return data.products.filter((p) => {
       if (scope === "afterdark" && !p.isAfterDark) return false;
+      if (avail === "low") return isLowStock(p);
       if (avail !== "all" && p.availability !== avail) return false;
       return true;
     });
   }, [data, scope, avail]);
 
   const t = data?.totals;
+  const lowCount = useMemo(
+    () => (data ? data.products.filter(isLowStock).length : 0),
+    [data],
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -207,11 +228,12 @@ export default function Dashboard({
       )}
 
       {t && (
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Stat label="Hirono products" value={t.products} />
           <Stat label="In stock" value={t.inStock} tone="emerald" />
+          <Stat label="⚡ Low stock" value={lowCount} tone="amber" />
           <Stat label="Sold out" value={t.soldOut} tone="rose" />
-          <Stat label="Upcoming" value={t.upcoming} tone="amber" />
+          <Stat label="Upcoming" value={t.upcoming} tone="zinc" />
           <Stat
             label="After Dark in stock"
             value={`${t.afterDarkInStock}/${t.afterDark}`}
@@ -234,6 +256,7 @@ export default function Dashboard({
           options={[
             { k: "all", label: "Any" },
             { k: "in_stock", label: "In stock" },
+            { k: "low", label: "⚡ Low" },
             { k: "sold_out", label: "Sold out" },
             { k: "upcoming", label: "Upcoming" },
           ]}
@@ -333,10 +356,16 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           After Dark
         </span>
       )}
-      {justRestocked && (
+      {justRestocked ? (
         <span className="absolute right-2 top-2 z-10 animate-pulse rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
           RESTOCKED
         </span>
+      ) : (
+        isLowStock(p) && (
+          <span className="absolute right-2 top-2 z-10 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-black">
+            ⚡ LOW STOCK
+          </span>
+        )
       )}
       <div className="aspect-square w-full overflow-hidden bg-zinc-800">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -356,7 +385,13 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
             {meta.label}
           </span>
           {p.availability === "in_stock" && (
-            <span className="text-xs text-zinc-500">{p.stock} left</span>
+            <span
+              className={`text-xs ${
+                p.stock <= LOW_STOCK_THRESHOLD ? "font-semibold text-amber-400" : "text-zinc-500"
+              }`}
+            >
+              {p.stock} left
+            </span>
           )}
           {p.type === "draw" && (
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
@@ -385,12 +420,16 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
                 </span>
                 <span
                   className={
-                    v.availability === "in_stock"
-                      ? "text-emerald-300"
-                      : "text-zinc-500"
+                    v.availability !== "in_stock"
+                      ? "text-zinc-500"
+                      : isLowVariant(v)
+                        ? "font-semibold text-amber-400"
+                        : "text-emerald-300"
                   }
                 >
-                  {v.availability === "in_stock" ? `${v.stock} left` : "sold out"}
+                  {v.availability === "in_stock"
+                    ? `${isLowVariant(v) ? "⚡ " : ""}${v.stock} left`
+                    : "sold out"}
                 </span>
               </li>
             ))}
