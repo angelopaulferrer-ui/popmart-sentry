@@ -1,10 +1,10 @@
 name: Restock alerts (Hirono / After Dark)
 
-# GitHub's scheduler floor is 5 min, so to poll every ~2 min we trigger every
-# 6 min and loop 3 checks (t=0,2,4) inside one job. Public repo => free Actions.
+# GitHub's scheduler floor is 5 min, so to poll every ~60s we trigger every
+# 5 min and loop 5 checks (t=0,1,2,3,4) inside one job. Public repo => free Actions.
 on:
   schedule:
-    - cron: "*/6 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -25,17 +25,17 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Poll Pop Mart PH every 2 minutes
+      - name: Poll Pop Mart PH every 60 seconds
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ALERT_KEYWORD: hirono
         run: |
-          for i in 1 2 3; do
+          for i in 1 2 3 4 5; do
             echo "::group::check $i"
             node scripts/check-alerts.mjs || true
             echo "::endgroup::"
-            if [ "$i" -lt 3 ]; then sleep 120; fi
+            if [ "$i" -lt 5 ]; then sleep 60; fi
           done
 
       - name: Commit state changes (if any)

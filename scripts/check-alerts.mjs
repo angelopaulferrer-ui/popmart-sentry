@@ -59,8 +59,7 @@ async function scan() {
     if ((res?.items?.length ?? 0) < 50) break;
   }
 
-  const products = [];
-  for (const it of items) {
+  async function resolve(it) {
     let variants = [];
     let upcoming = false;
     try {
@@ -94,7 +93,7 @@ async function scan() {
         }
       }
     } catch {}
-    products.push({
+    return {
       id: it.id,
       name: it.name,
       price: it.price,
@@ -102,7 +101,14 @@ async function scan() {
       url: `https://www.popmart.com/en-PH/products/${it.slugTitle ?? ""}/${it.id}`,
       upcoming,
       variants, // [{skuId, name, stock}]
-    });
+    };
+  }
+
+  // Resolve with limited concurrency so each pass is quick (~5s) yet gentle on the API.
+  const products = [];
+  const CONCURRENCY = 8;
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    products.push(...(await Promise.all(items.slice(i, i + CONCURRENCY).map(resolve))));
   }
   return products;
 }
