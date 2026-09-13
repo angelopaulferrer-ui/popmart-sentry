@@ -1,13 +1,16 @@
 // Standalone restock checker for GitHub Actions (no build step, uses Node's global fetch).
 // Mirrors lib/popmart.ts, then diffs against data/hirono-state.json and sends a
-// WhatsApp message (via the free CallMeBot relay) for any Hirono product that
-// transitions into stock.
+// WhatsApp message (via the official Meta WhatsApp Cloud API) for any Hirono
+// product that transitions into stock.
 //
-// Env:
-//   CALLMEBOT_PHONE   (required)  your WhatsApp number incl. country code, digits only (e.g. 639171234567)
-//   CALLMEBOT_APIKEY  (required)  the API key CallMeBot DMs you during setup
-//   ALERT_KEYWORD     (optional)  default "hirono"
-//   STATE_FILE        (optional)  default data/hirono-state.json
+// Env (all from the Meta WhatsApp > API Setup page):
+//   WA_TOKEN     (required)  access token (use a permanent System User token for the cron)
+//   WA_PHONE_ID  (required)  the sender "Phone number ID"
+//   WA_TO        (required)  your WhatsApp number, digits only incl. country code (e.g. 639954290741)
+//   WA_TEMPLATE  (optional)  approved template name for restocks; default "restock_alert"
+//   WA_LANG      (optional)  template language code; default "en_US"
+//   ALERT_KEYWORD(optional)  default "hirono"
+//   STATE_FILE   (optional)  default data/hirono-state.json
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -16,8 +19,11 @@ const API_BASE = "https://prod-apac-api.popmart.com";
 const AREA = "PH";
 const KEYWORD = process.env.ALERT_KEYWORD || "hirono";
 const STATE_FILE = process.env.STATE_FILE || "data/hirono-state.json";
-const PHONE = process.env.CALLMEBOT_PHONE;
-const APIKEY = process.env.CALLMEBOT_APIKEY;
+const WA_TOKEN = process.env.WA_TOKEN;
+const WA_PHONE_ID = process.env.WA_PHONE_ID;
+const WA_TO = process.env.WA_TO;
+const WA_TEMPLATE = process.env.WA_TEMPLATE || "restock_alert";
+const WA_LANG = process.env.WA_LANG || "en_US";
 
 const HEADERS = {
   "content-type": "application/json",
@@ -105,20 +111,49 @@ async function saveState(map) {
   await writeFile(STATE_FILE, JSON.stringify(map, null, 2) + "\n", "utf8");
 }
 
-// Send a WhatsApp message via the free CallMeBot relay.
-async function sendWhatsApp(text) {
-  if (!PHONE || !APIKEY) {
-    console.log("[dry-run] no CallMeBot creds; would send:\n" + text);
+// Send a WhatsApp template message via the official Meta Cloud API.
+// Template messages can be delivered proactively (no 24h-window restriction).
+async function sendTemplate(name, params = [], lang = WA_LANG) {
+  if (!WA_TOKEN || !WA_PHONE_ID || !WA_TO) {
+    console.log(
+      `[dry-run] no WhatsApp creds; would send template "${name}" with params:`,
+      params,
+    );
     return;
   }
-  const url =
-    `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(PHONE)}` +
-    `&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(APIKEY)}`;
-  const res = await fetch(url);
+  const payload = {
+    messaging_product: "whatsapp",
+    to: WA_TO,
+    type: "template",
+    template: {
+      name,
+      language: { code: lang },
+      ...(params.length
+        ? {
+            components: [
+              {
+                type: "body",
+                parameters: params.map((text) => ({ type: "text", text })),
+              },
+            ],
+          }
+        : {}),
+    },
+  };
+  const res = await fetch(
+    `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${WA_TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
   const body = await res.text();
-  if (!res.ok || /error|invalid|wrong/i.test(body)) {
-    console.error("CallMeBot send issue:", res.status, body.slice(0, 200));
-  }
+  if (!res.ok) console.error("WhatsApp send failed:", res.status, body.slice(0, 300));
+  else console.log("WhatsApp sent:", name);
 }
 
 async function main() {
@@ -126,17 +161,17 @@ async function main() {
   const prev = await loadState();
   const nextState = Object.fromEntries(products.map((p) => [p.id, p.availability]));
 
-  // First ever run: establish baseline, no per-item spam.
+  // First ever run: establish baseline, no per-item spam. Confirm via the
+  // pre-approved hello_world template (works immediately, no approval wait).
   if (!prev) {
     await saveState(nextState);
     const afterDark = products.filter((p) => p.isAfterDark);
     const adIn = afterDark.filter((p) => p.availability === "in_stock").length;
-    await sendWhatsApp(
-      `🤖 Popmart Sentry is now watching ${products.length} Hirono products on Pop Mart PH.\n` +
-        `⭐ After Dark: ${adIn}/${afterDark.length} in stock right now.\n` +
-        `You'll get a ping the moment anything restocks.`,
+    console.log(
+      `Baseline: ${products.length} Hirono products, After Dark ${adIn}/${afterDark.length} in stock.`,
     );
-    console.log("Baseline saved; startup message sent.");
+    await sendTemplate("hello_world");
+    console.log("Baseline saved; startup confirmation sent.");
     return;
   }
 
@@ -148,15 +183,15 @@ async function main() {
   restocked.sort((a, b) => Number(b.isAfterDark) - Number(a.isAfterDark));
 
   for (const p of restocked) {
-    const flag = p.isAfterDark ? "⭐ AFTER DARK — " : "";
-    await sendWhatsApp(
-      `🟢 RESTOCK on Pop Mart PH\n` +
-        `${flag}${p.name}\n` +
-        `${peso(p.price)} · ${p.stock} left\n` +
-        `${p.url}`,
-    );
+    const flag = p.isAfterDark ? "⭐ AFTER DARK: " : "";
+    // Template body params: {{1}} product, {{2}} price · stock, {{3}} url
+    await sendTemplate(WA_TEMPLATE, [
+      `${flag}${p.name}`,
+      `${peso(p.price)} · ${p.stock} left`,
+      p.url,
+    ]);
     console.log("Alerted restock:", p.name);
-    await sleep(4000); // stay under CallMeBot's rate limit
+    await sleep(2000);
   }
 
   const changed = JSON.stringify(prev) !== JSON.stringify(nextState);
