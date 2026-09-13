@@ -137,14 +137,24 @@ export default function Dashboard({
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Popmart Sentry
-            <span className="ml-2 rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-xs font-medium text-fuchsia-300 ring-1 ring-fuchsia-500/30">
-              Hirono · PH
-            </span>
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/hirono-mark.png"
+            alt="Hirono"
+            width={52}
+            height={52}
+            className="h-13 w-13 shrink-0 rounded-xl ring-1 ring-white/10"
+            style={{ height: 52, width: 52 }}
+          />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Popmart Sentry
+              <span className="ml-2 rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-xs font-medium text-fuchsia-300 ring-1 ring-fuchsia-500/30">
+                Hirono · PH
+              </span>
+            </h1>
+            <p className="mt-1 text-sm text-zinc-400">
             Live availability from popmart.com/ph ·{" "}
             {data ? (
               <>
@@ -157,6 +167,7 @@ export default function Dashboard({
               "—"
             )}
           </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
