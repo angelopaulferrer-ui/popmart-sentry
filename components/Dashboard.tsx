@@ -68,6 +68,7 @@ type RestockEvent = {
   stock: number;
   isAfterDark: boolean;
   url: string;
+  note?: string;
 };
 
 const phTime = (iso: string) =>
@@ -389,8 +390,13 @@ function RestockLogModal({
                   className="rounded-lg bg-stone-950 p-3 text-stone-100"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-emerald-400">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
                       🟢 Restocked
+                      {e.note && (
+                        <span className="rounded bg-white/10 px-1 py-0.5 text-[10px] font-normal text-stone-300">
+                          {e.note}
+                        </span>
+                      )}
                     </span>
                     <time className="text-xs text-stone-400">{phTime(e.at)}</time>
                   </div>
