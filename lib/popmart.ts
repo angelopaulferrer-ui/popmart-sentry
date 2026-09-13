@@ -70,6 +70,8 @@ export interface SpuDetail {
   currentTimestamp?: number;
   skus?: Sku[];
   sales?: number;
+  // Real inventory rollup — remainStock is the true "units left" the storefront uses.
+  indexData?: { remainStock?: number };
 }
 
 export interface Product {
@@ -134,10 +136,12 @@ function deriveSeries(name: string): string {
 }
 
 function classify(detail: SpuDetail): { availability: Availability; stock: number } {
-  const stock = (detail.skus ?? []).reduce(
-    (sum, s) => sum + (Number(s.tmpStock) || 0),
-    0,
-  );
+  // Prefer indexData.remainStock (true units left); fall back to summing SKU tmpStock.
+  const remain = detail.indexData?.remainStock;
+  const stock =
+    typeof remain === "number"
+      ? remain
+      : (detail.skus ?? []).reduce((sum, s) => sum + (Number(s.tmpStock) || 0), 0);
   const now = detail.currentTimestamp ?? Date.now();
   const start = detail.saleStartAt ? Date.parse(detail.saleStartAt) : 0;
   if (!detail.publish || !detail.show) return { availability: "unknown", stock };
@@ -183,7 +187,7 @@ export async function scanHirono(keyword = "hirono"): Promise<ScanResult> {
           id: it.id,
           name,
           slug,
-          url: `https://www.popmart.com/ph/products/${it.id}/${slug}`,
+          url: `https://www.popmart.com/en-PH/products/${slug}/${it.id}`,
           image: it.mainImage,
           price: (it.price ?? 0) / 100,
           currency: CURRENCY,
