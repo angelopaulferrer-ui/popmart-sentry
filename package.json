@@ -1,33 +1,27 @@
 {
   "name": "popmart-sentry",
   "version": "0.1.0",
-  "description": "Restock monitor for Pop Mart products — polls product pages and alerts when items come back in stock.",
-  "type": "module",
-  "main": "dist/index.js",
-  "bin": {
-    "popmart-sentry": "dist/index.js"
-  },
+  "private": true,
+  "description": "Live availability dashboard for Pop Mart PH — watches all Hirono products, prioritising the After Dark series.",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "check": "tsx src/index.ts --once"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [
-    "popmart",
-    "restock",
-    "monitor",
-    "labubu",
-    "scraper"
-  ],
-  "license": "MIT",
   "dependencies": {
-    "undici": "^6.19.8"
+    "next": "15.5.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22.5.0",
-    "tsx": "^4.19.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "playwright": "^1.63.0",
+    "tailwindcss": "^4.1.13",
     "typescript": "^5.5.4"
   }
 }
