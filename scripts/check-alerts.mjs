@@ -47,6 +47,16 @@ const peso = (cents) =>
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const phDate = (iso) =>
+  new Date(iso).toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
 async function scan() {
   const items = [];
   for (let page = 1; page <= 10; page++) {
@@ -64,8 +74,10 @@ async function scan() {
   async function resolve(it) {
     let variants = [];
     let upcoming = false;
+    let saleStartAt = null;
     try {
       const d = await rpc("ec/spu/public_FindOne", { id: it.id, channel: "shop" });
+      saleStartAt = d?.saleStartAt ?? null;
       const now = d?.currentTimestamp ?? Date.now();
       const start = d?.saleStartAt ? Date.parse(d.saleStartAt) : 0;
       upcoming = !!(start && start > now) || !d?.publish || !d?.show;
@@ -99,6 +111,7 @@ async function scan() {
       id: it.id,
       name: it.name,
       price: it.price,
+      saleStartAt: saleStartAt ?? null,
       isAfterDark: /after\s*dark/i.test(it.name),
       url: `https://www.popmart.com/en-PH/products/${it.slugTitle ?? ""}/${it.id}`,
       upcoming,
@@ -225,6 +238,27 @@ async function main() {
         `${p.url}`,
     );
     console.log("Alerted restock:", p.name, p.variants.length > 1 ? `(${v.name})` : "");
+    await sleep(1500);
+  }
+
+  // New-listing alerts: products whose variants are ALL unseen since last scan —
+  // i.e. a brand-new Hirono item just appeared in the catalog (a drop got scheduled).
+  const newListings = products.filter(
+    (p) => p.variants.length && p.variants.every((v) => prev[v.skuId] === undefined),
+  );
+  newListings.sort((a, b) => Number(b.isAfterDark) - Number(a.isAfterDark));
+  for (const p of newListings.slice(0, 8)) {
+    const flag = p.isAfterDark ? "⭐ <b>AFTER DARK</b> " : "";
+    let when = "on sale now";
+    if (p.saleStartAt && Date.parse(p.saleStartAt) > Date.now())
+      when = `drops ${phDate(p.saleStartAt)}`;
+    await sendTelegram(
+      `🆕 <b>NEW Hirono listing — Pop Mart PH</b>\n` +
+        `${flag}${esc(p.name)}\n` +
+        `${peso(p.price)} · ${when}\n` +
+        `${p.url}`,
+    );
+    console.log("Alerted new listing:", p.name);
     await sleep(1500);
   }
 
