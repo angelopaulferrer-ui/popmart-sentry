@@ -370,15 +370,59 @@ const POPNOW_PRESETS: Record<string, PopNowPreset> = {
   },
 };
 
+type BoxCell = { soldOut: boolean; not: string[] };
+
+// Exact per-box odds across a full set via no-duplicate constraint solving.
+// Enumerates all valid figure→box assignments (n! max, tiny) honoring each box's
+// NOT hints, then returns per-box figure counts + total.
+function analyzeSet(regulars: string[], boxes: BoxCell[]) {
+  const n = boxes.length;
+  const counts: Record<string, number>[] = boxes.map(() => ({}));
+  if (regulars.length !== n) {
+    // Fallback: independent per-box candidates (can't solve a non-standard set).
+    boxes.forEach((b, i) => {
+      for (const f of regulars) if (!b.not.includes(f)) counts[i][f] = 1;
+    });
+    return { counts, total: 1, exact: false };
+  }
+  let total = 0;
+  const used = new Array(regulars.length).fill(false);
+  const assign: (string | null)[] = new Array(n).fill(null);
+  const rec = (slot: number) => {
+    if (slot === n) {
+      total++;
+      for (let i = 0; i < n; i++) {
+        const f = assign[i] as string;
+        counts[i][f] = (counts[i][f] || 0) + 1;
+      }
+      return;
+    }
+    for (let f = 0; f < regulars.length; f++) {
+      if (used[f]) continue;
+      const fig = regulars[f];
+      if (boxes[slot].not.includes(fig)) continue;
+      used[f] = true;
+      assign[slot] = fig;
+      rec(slot + 1);
+      used[f] = false;
+      assign[slot] = null;
+    }
+  };
+  rec(0);
+  return { counts, total, exact: true };
+}
+
 function PopNowHelper({ onClose }: { onClose: () => void }) {
-  const [mode, setMode] = useState<"mist-walker" | "custom">("mist-walker");
+  const [series, setSeries] = useState<"mist-walker" | "custom">("mist-walker");
   const [customText, setCustomText] = useState("");
   const [customSecret, setCustomSecret] = useState("");
   const [customRatio, setCustomRatio] = useState(72);
-  const [ruledOut, setRuledOut] = useState<Set<string>>(new Set());
+  const [boxes, setBoxes] = useState<BoxCell[]>(
+    Array.from({ length: 6 }, () => ({ soldOut: false, not: [] })),
+  );
+  const [target, setTarget] = useState("");
 
-  const preset = mode !== "custom" ? POPNOW_PRESETS[mode] : null;
-
+  const preset = series !== "custom" ? POPNOW_PRESETS[series] : null;
   const regulars = preset
     ? preset.regulars
     : customText
@@ -388,51 +432,72 @@ function PopNowHelper({ onClose }: { onClose: () => void }) {
   const secret = preset ? preset.secret : customSecret.trim() || null;
   const ratio = preset ? preset.ratio : Number(customRatio) || 0;
 
-  const toggle = (name: string) =>
-    setRuledOut((prev) => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
-
-  const remaining = regulars.filter((n) => !ruledOut.has(n));
-  const secretInPlay = secret ? !ruledOut.has(secret) : false;
-  const pctEach = remaining.length ? Math.round((100 / remaining.length) * 10) / 10 : 0;
-
-  const chip = (name: string, isSecret = false) => {
-    const out = ruledOut.has(name);
-    return (
-      <button
-        key={name}
-        onClick={() => toggle(name)}
-        className={`rounded-full px-3 py-1 text-xs font-medium ring-1 transition ${
-          out
-            ? "bg-stone-200 text-stone-400 line-through ring-stone-900/10"
-            : isSecret
-              ? "bg-amber-100 text-amber-900 ring-amber-500/40"
-              : "bg-white text-stone-800 ring-stone-900/15 hover:bg-stone-100"
-        }`}
-      >
-        {isSecret ? "⭐ " : ""}
-        {name}
-      </button>
+  const toggleNot = (bi: number, fig: string) =>
+    setBoxes((prev) =>
+      prev.map((b, i) =>
+        i !== bi
+          ? b
+          : {
+              ...b,
+              not: b.not.includes(fig)
+                ? b.not.filter((x) => x !== fig)
+                : [...b.not, fig],
+            },
+      ),
     );
+  const toggleSold = (bi: number) =>
+    setBoxes((prev) =>
+      prev.map((b, i) => (i === bi ? { ...b, soldOut: !b.soldOut } : b)),
+    );
+  const resetBoxes = () =>
+    setBoxes(Array.from({ length: 6 }, () => ({ soldOut: false, not: [] })));
+
+  const { counts, total, exact } = analyzeSet(regulars, boxes);
+  const contradiction = exact && total === 0;
+
+  const boxCandidates = (bi: number) => {
+    const c = counts[bi] || {};
+    const list = Object.entries(c)
+      .map(([name, n]) => ({ name, pct: total ? (n / total) * 100 : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+    return list;
   };
+
+  // Best available box for the chosen target figure.
+  let bestForTarget: { boxes: number[]; pct: number } | null = null;
+  if (target) {
+    let best = -1;
+    const winners: number[] = [];
+    boxes.forEach((b, i) => {
+      if (b.soldOut) return;
+      const pct = total ? ((counts[i][target] || 0) / total) * 100 : 0;
+      if (pct > best + 0.01) {
+        best = pct;
+        winners.length = 0;
+        winners.push(i);
+      } else if (Math.abs(pct - best) <= 0.01 && pct > 0) {
+        winners.push(i);
+      }
+    });
+    bestForTarget = { boxes: winners, pct: Math.max(0, best) };
+  }
+
+  const fmt = (n: number) => `${Math.round(n * 10) / 10}%`;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-10"
       onClick={onClose}
     >
       <div
-        className="max-h-[82vh] w-full max-w-lg overflow-hidden rounded-2xl bg-[#f6efdf] shadow-xl ring-1 ring-stone-900/20"
+        className="max-h-[86vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-[#f6efdf] shadow-xl ring-1 ring-stone-900/20"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-stone-900/10 px-4 py-3">
           <div>
             <h2 className="text-base font-bold text-stone-900">🎲 Pop Now helper</h2>
             <p className="text-xs text-stone-500">
-              Tap the figures a box’s hints ruled out — see what’s left.
+              Enter each box’s hints → exact odds per box (no-duplicate solved).
             </p>
           </div>
           <button
@@ -443,18 +508,19 @@ function PopNowHelper({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto p-4">
+        <div className="max-h-[74vh] space-y-4 overflow-y-auto p-4">
           {/* Series selector */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {(["mist-walker", "custom"] as const).map((k) => (
               <button
                 key={k}
                 onClick={() => {
-                  setMode(k);
-                  setRuledOut(new Set());
+                  setSeries(k);
+                  resetBoxes();
+                  setTarget("");
                 }}
                 className={`rounded-lg px-3 py-1 text-sm font-medium transition ${
-                  mode === k
+                  series === k
                     ? "bg-stone-900 text-white"
                     : "bg-[#e7dcc4] text-stone-700 ring-1 ring-stone-900/15"
                 }`}
@@ -462,25 +528,31 @@ function PopNowHelper({ onClose }: { onClose: () => void }) {
                 {k === "custom" ? "Custom series" : POPNOW_PRESETS[k].label}
               </button>
             ))}
+            <button
+              onClick={resetBoxes}
+              className="ml-auto rounded-lg bg-[#e7dcc4] px-3 py-1 text-xs font-medium text-stone-600 ring-1 ring-stone-900/15 hover:bg-[#dccbac]"
+            >
+              Reset boxes
+            </button>
           </div>
 
-          {mode === "custom" && (
+          {series === "custom" && (
             <div className="space-y-2 rounded-lg bg-[#efe7d3] p-3 ring-1 ring-stone-900/10">
               <label className="block text-xs font-medium text-stone-600">
-                Figure names (one per line, from the tray)
+                Figure names — exactly 6 for a standard set (one per line)
               </label>
               <textarea
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
-                rows={5}
-                placeholder={"The Foo\nThe Bar\nThe Baz"}
+                rows={4}
+                placeholder={"The Foo\nThe Bar\n…"}
                 className="w-full rounded-md bg-white p-2 text-sm text-stone-900 ring-1 ring-stone-900/15"
               />
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   value={customSecret}
                   onChange={(e) => setCustomSecret(e.target.value)}
-                  placeholder="Secret name (exact)"
+                  placeholder="Secret name (optional)"
                   className="flex-1 rounded-md bg-white p-2 text-sm text-stone-900 ring-1 ring-stone-900/15"
                 />
                 <span className="text-xs text-stone-600">1 in</span>
@@ -494,65 +566,145 @@ function PopNowHelper({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {/* Figures */}
+          {/* Box Status grid */}
           <div>
             <p className="mb-2 text-xs font-medium text-stone-600">
-              Ruled out by hints (tap to strike):
+              Box Status — tap a figure to mark it “NOT” for that box; toggle Sold out.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {regulars.map((n) => chip(n))}
-              {secret && chip(secret, true)}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {boxes.map((b, i) => (
+                <div
+                  key={i}
+                  className={`rounded-lg p-2 ring-1 ${
+                    b.soldOut
+                      ? "bg-stone-200/60 ring-stone-900/10"
+                      : "bg-white ring-stone-900/15"
+                  }`}
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="rounded bg-stone-900 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <label className="flex items-center gap-1 text-[10px] text-stone-500">
+                      <input
+                        type="checkbox"
+                        checked={b.soldOut}
+                        onChange={() => toggleSold(i)}
+                        className="accent-stone-800"
+                      />
+                      Sold out
+                    </label>
+                  </div>
+                  {b.soldOut ? (
+                    <p className="py-2 text-center text-[11px] font-medium text-stone-400">
+                      SOLD OUT
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {regulars.map((f) => {
+                        const off = b.not.includes(f);
+                        return (
+                          <button
+                            key={f}
+                            onClick={() => toggleNot(i, f)}
+                            title={f}
+                            className={`rounded px-1.5 py-0.5 text-[10px] transition ${
+                              off
+                                ? "bg-rose-100 text-rose-700 line-through ring-1 ring-rose-500/30"
+                                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                            }`}
+                          >
+                            {f.replace(/^The\s+/, "")}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Result */}
-          <div className="rounded-xl bg-stone-950 p-4 text-stone-100">
-            {remaining.length === 0 && !secretInPlay ? (
-              <p className="text-sm text-stone-300">
-                Add figures (or un-strike some) to see the odds.
+          {/* Target */}
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs font-medium text-stone-600">
+              Target figure:
+            </label>
+            <select
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              className="rounded-md bg-white px-2 py-1 text-sm text-stone-900 ring-1 ring-stone-900/15"
+            >
+              <option value="">(none — show all)</option>
+              {regulars.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Results */}
+          <div className="space-y-2 rounded-xl bg-stone-950 p-4 text-stone-100">
+            {contradiction ? (
+              <p className="text-sm text-amber-300">
+                ⚠️ These hints don’t fit a standard all-regular set. Double-check a
+                hint — or the secret {secret ? `(⭐ ${secret})` : ""} may be in this
+                set.
               </p>
             ) : (
               <>
-                <p className="text-sm">
-                  This box is one of{" "}
-                  <span className="font-bold text-white">{remaining.length}</span>{" "}
-                  {remaining.length === 1 ? "figure" : "figures"} —{" "}
-                  <span className="font-semibold text-emerald-400">
-                    ~{pctEach}% each
-                  </span>
-                  :
-                </p>
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {remaining.map((n) => (
-                    <li
-                      key={n}
-                      className="rounded bg-white/10 px-2 py-0.5 text-xs text-stone-100"
-                    >
-                      {n}
-                    </li>
-                  ))}
-                </ul>
+                {bestForTarget && target && (
+                  <p className="text-sm">
+                    🎯{" "}
+                    {bestForTarget.pct <= 0 ? (
+                      <span className="text-rose-400">
+                        {target} can’t be in any available box (it’s in a taken box).
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 font-semibold">
+                        Best for {target}: Box{" "}
+                        {bestForTarget.boxes.map((b) => b + 1).join(" or ")} (
+                        {fmt(bestForTarget.pct)})
+                      </span>
+                    )}
+                  </p>
+                )}
+                {boxes.map((b, i) =>
+                  b.soldOut ? null : (
+                    <div key={i} className="text-xs">
+                      <span className="font-semibold text-white">Box {i + 1}: </span>
+                      {boxCandidates(i).length === 0 ? (
+                        <span className="text-stone-400">no candidates</span>
+                      ) : (
+                        boxCandidates(i).map((c, j) => (
+                          <span key={c.name}>
+                            {j > 0 && <span className="text-stone-600"> · </span>}
+                            <span
+                              className={
+                                target && c.name === target
+                                  ? "font-semibold text-amber-300"
+                                  : "text-stone-200"
+                              }
+                            >
+                              {c.name.replace(/^The\s+/, "")} {fmt(c.pct)}
+                            </span>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  ),
+                )}
                 {secret && (
-                  <p
-                    className={`mt-3 text-xs ${
-                      secretInPlay ? "text-amber-300" : "text-stone-500"
-                    }`}
-                  >
-                    {secretInPlay
-                      ? `⭐ Secret (${secret}) not ruled out — but its base rate is only ~1/${ratio}, so a standard set almost never contains it. Treat this box as a regular.`
-                      : `⭐ Secret (${secret}) is ruled out for this box.`}
+                  <p className="pt-1 text-[11px] text-stone-500">
+                    ⭐ Secret ({secret}) base rate ~1/{ratio}. A set that solves
+                    cleanly (above) has no secret — buying it from a reseller beats
+                    chasing it.
                   </p>
                 )}
               </>
             )}
           </div>
-
-          <p className="text-[11px] leading-relaxed text-stone-500">
-            Standard Pop Now sets are 6 boxes = the 6 regulars (no duplicates). Hints
-            (“NOT ME”) narrow a box; a paid Hint Card usually pins the exact figure.
-            The secret only appears in the rare ~1/{ratio || "?"} case — buying it from a
-            reseller is far cheaper than chasing it.
-          </p>
         </div>
       </div>
     </div>
