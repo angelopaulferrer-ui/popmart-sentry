@@ -99,6 +99,7 @@ export default function Dashboard({
   const [showLog, setShowLog] = useState(false);
   const [logEvents, setLogEvents] = useState<RestockEvent[] | null>(null);
   const [logLoading, setLogLoading] = useState(false);
+  const [showHelper, setShowHelper] = useState(false);
   const prevAvail = useRef<Map<string, Availability>>(new Map());
 
   // Seed the previous-availability map from the first server render.
@@ -251,6 +252,12 @@ export default function Dashboard({
             {alertsOn ? "🔔 Alerts on" : "Enable restock alerts"}
           </button>
           <button
+            onClick={() => setShowHelper(true)}
+            className="rounded-lg bg-[#e7dcc4] px-3 py-1.5 text-sm font-medium text-stone-700 ring-1 ring-stone-900/15 transition hover:bg-[#dccbac]"
+          >
+            🎲 Pop Now helper
+          </button>
+          <button
             onClick={openLog}
             className="rounded-lg bg-[#e7dcc4] px-3 py-1.5 text-sm font-medium text-stone-700 ring-1 ring-stone-900/15 transition hover:bg-[#dccbac]"
           >
@@ -337,7 +344,218 @@ export default function Dashboard({
           onClose={() => setShowLog(false)}
         />
       )}
+
+      {showHelper && <PopNowHelper onClose={() => setShowHelper(false)} />}
     </main>
+  );
+}
+
+// ---- Pop Now odds helper --------------------------------------------------
+
+type PopNowPreset = { label: string; regulars: string[]; secret: string; ratio: number };
+
+const POPNOW_PRESETS: Record<string, PopNowPreset> = {
+  "mist-walker": {
+    label: "Hirono · Mist-Walker",
+    regulars: [
+      "The Primordial Grace",
+      "The Gap-Glimmer Wanderer",
+      "The Unfallen Wing",
+      "The Backlit Messenger",
+      "The Wingless Follower",
+      "The Soul Corroder",
+    ],
+    secret: "The Tempered Aegis",
+    ratio: 72,
+  },
+};
+
+function PopNowHelper({ onClose }: { onClose: () => void }) {
+  const [mode, setMode] = useState<"mist-walker" | "custom">("mist-walker");
+  const [customText, setCustomText] = useState("");
+  const [customSecret, setCustomSecret] = useState("");
+  const [customRatio, setCustomRatio] = useState(72);
+  const [ruledOut, setRuledOut] = useState<Set<string>>(new Set());
+
+  const preset = mode !== "custom" ? POPNOW_PRESETS[mode] : null;
+
+  const regulars = preset
+    ? preset.regulars
+    : customText
+        .split(/\n|,/)
+        .map((s) => s.trim())
+        .filter((s) => s && s !== customSecret.trim());
+  const secret = preset ? preset.secret : customSecret.trim() || null;
+  const ratio = preset ? preset.ratio : Number(customRatio) || 0;
+
+  const toggle = (name: string) =>
+    setRuledOut((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+
+  const remaining = regulars.filter((n) => !ruledOut.has(n));
+  const secretInPlay = secret ? !ruledOut.has(secret) : false;
+  const pctEach = remaining.length ? Math.round((100 / remaining.length) * 10) / 10 : 0;
+
+  const chip = (name: string, isSecret = false) => {
+    const out = ruledOut.has(name);
+    return (
+      <button
+        key={name}
+        onClick={() => toggle(name)}
+        className={`rounded-full px-3 py-1 text-xs font-medium ring-1 transition ${
+          out
+            ? "bg-stone-200 text-stone-400 line-through ring-stone-900/10"
+            : isSecret
+              ? "bg-amber-100 text-amber-900 ring-amber-500/40"
+              : "bg-white text-stone-800 ring-stone-900/15 hover:bg-stone-100"
+        }`}
+      >
+        {isSecret ? "⭐ " : ""}
+        {name}
+      </button>
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[82vh] w-full max-w-lg overflow-hidden rounded-2xl bg-[#f6efdf] shadow-xl ring-1 ring-stone-900/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-stone-900/10 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-stone-900">🎲 Pop Now helper</h2>
+            <p className="text-xs text-stone-500">
+              Tap the figures a box’s hints ruled out — see what’s left.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-stone-700"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto p-4">
+          {/* Series selector */}
+          <div className="flex flex-wrap gap-2">
+            {(["mist-walker", "custom"] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => {
+                  setMode(k);
+                  setRuledOut(new Set());
+                }}
+                className={`rounded-lg px-3 py-1 text-sm font-medium transition ${
+                  mode === k
+                    ? "bg-stone-900 text-white"
+                    : "bg-[#e7dcc4] text-stone-700 ring-1 ring-stone-900/15"
+                }`}
+              >
+                {k === "custom" ? "Custom series" : POPNOW_PRESETS[k].label}
+              </button>
+            ))}
+          </div>
+
+          {mode === "custom" && (
+            <div className="space-y-2 rounded-lg bg-[#efe7d3] p-3 ring-1 ring-stone-900/10">
+              <label className="block text-xs font-medium text-stone-600">
+                Figure names (one per line, from the tray)
+              </label>
+              <textarea
+                value={customText}
+                onChange={(e) => setCustomText(e.target.value)}
+                rows={5}
+                placeholder={"The Foo\nThe Bar\nThe Baz"}
+                className="w-full rounded-md bg-white p-2 text-sm text-stone-900 ring-1 ring-stone-900/15"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={customSecret}
+                  onChange={(e) => setCustomSecret(e.target.value)}
+                  placeholder="Secret name (exact)"
+                  className="flex-1 rounded-md bg-white p-2 text-sm text-stone-900 ring-1 ring-stone-900/15"
+                />
+                <span className="text-xs text-stone-600">1 in</span>
+                <input
+                  type="number"
+                  value={customRatio}
+                  onChange={(e) => setCustomRatio(Number(e.target.value))}
+                  className="w-16 rounded-md bg-white p-2 text-sm text-stone-900 ring-1 ring-stone-900/15"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Figures */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-stone-600">
+              Ruled out by hints (tap to strike):
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {regulars.map((n) => chip(n))}
+              {secret && chip(secret, true)}
+            </div>
+          </div>
+
+          {/* Result */}
+          <div className="rounded-xl bg-stone-950 p-4 text-stone-100">
+            {remaining.length === 0 && !secretInPlay ? (
+              <p className="text-sm text-stone-300">
+                Add figures (or un-strike some) to see the odds.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm">
+                  This box is one of{" "}
+                  <span className="font-bold text-white">{remaining.length}</span>{" "}
+                  {remaining.length === 1 ? "figure" : "figures"} —{" "}
+                  <span className="font-semibold text-emerald-400">
+                    ~{pctEach}% each
+                  </span>
+                  :
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-1.5">
+                  {remaining.map((n) => (
+                    <li
+                      key={n}
+                      className="rounded bg-white/10 px-2 py-0.5 text-xs text-stone-100"
+                    >
+                      {n}
+                    </li>
+                  ))}
+                </ul>
+                {secret && (
+                  <p
+                    className={`mt-3 text-xs ${
+                      secretInPlay ? "text-amber-300" : "text-stone-500"
+                    }`}
+                  >
+                    {secretInPlay
+                      ? `⭐ Secret (${secret}) not ruled out — but its base rate is only ~1/${ratio}, so a standard set almost never contains it. Treat this box as a regular.`
+                      : `⭐ Secret (${secret}) is ruled out for this box.`}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-stone-500">
+            Standard Pop Now sets are 6 boxes = the 6 regulars (no duplicates). Hints
+            (“NOT ME”) narrow a box; a paid Hint Card usually pins the exact figure.
+            The secret only appears in the rare ~1/{ratio || "?"} case — buying it from a
+            reseller is far cheaper than chasing it.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
