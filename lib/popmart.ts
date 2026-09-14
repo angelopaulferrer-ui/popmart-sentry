@@ -120,21 +120,24 @@ export interface ScanResult {
   products: Product[];
 }
 
-async function searchAllPages(keyword: string): Promise<SearchItem[]> {
-  const pageSize = 50;
-  let page = 1;
+// Pop Mart's search q="" returns the WHOLE catalog (~700 items, ~7 pages). We
+// fetch it and filter by ipName — keyword search is fuzzy and leaks other IPs
+// (e.g. "THE MONSTERS" would pull in CRYBABY), whereas ipName is exact.
+async function fetchCatalog(): Promise<SearchItem[]> {
+  const pageSize = 100;
   const all: SearchItem[] = [];
-  // Bounded loop; Hirono is ~40 items but paginate defensively.
-  for (; page <= 10; page++) {
+  let total = Infinity;
+  for (let page = 1; page <= 30; page++) {
     const res = await rpc<SearchResponse>("search/public_search", {
-      q: keyword,
+      q: "",
       page,
       pageSize,
       isIncludePopNow: true,
     });
     const items = res?.items ?? [];
     all.push(...items);
-    if (items.length < pageSize || all.length >= (res?.total ?? all.length)) break;
+    total = res?.total ?? total;
+    if (items.length < pageSize || all.length >= total) break;
   }
   return all;
 }
@@ -198,10 +201,15 @@ async function getDrawStock(spuId: string): Promise<Variant | null> {
   }
 }
 
-/** Full scan: list every Hirono product and resolve live stock for each. */
-export async function scanHirono(keyword = "hirono"): Promise<ScanResult> {
-  const items = (await searchAllPages(keyword)).filter(
-    (it) => it.channel === "shop" && (it.areaCodes?.includes(AREA) ?? true),
+/** Full scan: list every product for an IP (matched by ipName) and resolve live stock. */
+export async function scanIp(ip = "Hirono"): Promise<ScanResult> {
+  const keyword = ip.trim();
+  const target = keyword.toLowerCase();
+  const items = (await fetchCatalog()).filter(
+    (it) =>
+      it.channel === "shop" &&
+      (it.ipName ?? "").toLowerCase() === target &&
+      (it.areaCodes?.includes(AREA) ?? true),
   );
 
   // Resolve stock detail for each product with limited concurrency.

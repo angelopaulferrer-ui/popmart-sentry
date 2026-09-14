@@ -58,20 +58,26 @@ const phDate = (iso) =>
     hour12: true,
   });
 
-async function scan(keyword) {
-  const items = [];
-  for (let page = 1; page <= 10; page++) {
+// Whole catalog (q=""), so we can filter by ipName (exact) instead of fuzzy keyword.
+async function fetchCatalog() {
+  const all = [];
+  let total = Infinity;
+  for (let page = 1; page <= 30; page++) {
     const res = await rpc("search/public_search", {
-      q: keyword,
+      q: "",
       page,
-      pageSize: 50,
+      pageSize: 100,
       isIncludePopNow: true,
     });
-    const batch = (res?.items ?? []).filter((it) => it.channel === "shop");
-    items.push(...batch);
-    if ((res?.items?.length ?? 0) < 50) break;
+    const items = res?.items ?? [];
+    all.push(...items);
+    total = res?.total ?? total;
+    if (items.length < 100 || all.length >= total) break;
   }
+  return all;
+}
 
+async function resolveItems(items) {
   async function resolve(it) {
     let variants = [];
     let upcoming = false;
@@ -120,7 +126,7 @@ async function scan(keyword) {
     };
   }
 
-  // Resolve with limited concurrency so each pass is quick (~5s) yet gentle on the API.
+  // Resolve with limited concurrency so each pass is quick yet gentle on the API.
   const products = [];
   const CONCURRENCY = 8;
   for (let i = 0; i < items.length; i += CONCURRENCY) {
@@ -206,12 +212,13 @@ async function loadWatchlist() {
 
 async function main() {
   const keywords = await loadWatchlist();
-  // Scan every watched IP and merge (dedupe by product id).
-  const merged = new Map();
-  for (const kw of keywords) {
-    for (const p of await scan(kw)) merged.set(p.id, p);
-  }
-  const products = [...merged.values()];
+  const targets = new Set(keywords.map((k) => k.trim().toLowerCase()));
+  // Fetch the catalog once, filter to the watched IPs by exact ipName, then resolve.
+  const catalog = await fetchCatalog();
+  const items = catalog.filter(
+    (it) => it.channel === "shop" && targets.has((it.ipName ?? "").toLowerCase()),
+  );
+  const products = await resolveItems(items);
   const prev = await loadState(); // { skuId: "in_stock" | "sold_out" }
   const nextState = variantStates(products);
 
