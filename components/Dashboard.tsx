@@ -100,6 +100,7 @@ export default function Dashboard({
   const [logEvents, setLogEvents] = useState<RestockEvent[] | null>(null);
   const [logLoading, setLogLoading] = useState(false);
   const [showHelper, setShowHelper] = useState(false);
+  const [showNews, setShowNews] = useState(false);
   const prevAvail = useRef<Map<string, Availability>>(new Map());
 
   // Seed the previous-availability map from the first server render.
@@ -252,6 +253,12 @@ export default function Dashboard({
             {alertsOn ? "🔔 Alerts on" : "Enable restock alerts"}
           </button>
           <button
+            onClick={() => setShowNews(true)}
+            className="rounded-lg bg-[#e7dcc4] px-3 py-1.5 text-sm font-medium text-stone-700 ring-1 ring-stone-900/15 transition hover:bg-[#dccbac]"
+          >
+            📰 News &amp; updates
+          </button>
+          <button
             onClick={() => setShowHelper(true)}
             className="rounded-lg bg-[#e7dcc4] px-3 py-1.5 text-sm font-medium text-stone-700 ring-1 ring-stone-900/15 transition hover:bg-[#dccbac]"
           >
@@ -346,7 +353,207 @@ export default function Dashboard({
       )}
 
       {showHelper && <PopNowHelper onClose={() => setShowHelper(false)} />}
+
+      {showNews && (
+        <NewsModal
+          products={data?.products ?? []}
+          onClose={() => setShowNews(false)}
+        />
+      )}
     </main>
+  );
+}
+
+// ---- News & updates -------------------------------------------------------
+
+function relTime(iso: string): string {
+  const ms = Date.parse(iso) - Date.now();
+  const past = ms < 0;
+  const a = Math.abs(ms);
+  const d = Math.floor(a / 86_400_000);
+  const h = Math.floor((a % 86_400_000) / 3_600_000);
+  const m = Math.floor((a % 3_600_000) / 60_000);
+  const s = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return past ? `${s} ago` : `in ${s}`;
+}
+
+function nextFriday(): Date {
+  const now = new Date();
+  const add = (5 - now.getDay() + 7) % 7; // Fri = 5; 0 means today is Friday
+  const d = new Date(now);
+  d.setDate(now.getDate() + add);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function NewsModal({
+  products,
+  onClose,
+}: {
+  products: Product[];
+  onClose: () => void;
+}) {
+  const now = Date.now();
+  const withDate = products.filter((p) => p.saleStartAt);
+
+  const upcoming = withDate
+    .filter((p) => Date.parse(p.saleStartAt as string) > now)
+    .sort((a, b) => Date.parse(a.saleStartAt!) - Date.parse(b.saleStartAt!));
+
+  const recent = withDate
+    .filter((p) => {
+      const t = Date.parse(p.saleStartAt as string);
+      return t <= now && now - t <= 14 * 86_400_000;
+    })
+    .sort((a, b) => Date.parse(b.saleStartAt!) - Date.parse(a.saleStartAt!));
+
+  const fri = nextFriday();
+  const friLabel = fri.toLocaleDateString("en-PH", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+  const isToday = fri.toDateString() === new Date().toDateString();
+
+  const row = (p: Product, kind: "up" | "recent") => (
+    <a
+      key={p.id + kind}
+      href={p.url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 rounded-lg bg-stone-950 p-2.5 text-stone-100 hover:bg-stone-900"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={p.image}
+        alt=""
+        className="h-12 w-12 shrink-0 rounded object-cover"
+        loading="lazy"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-white">
+          {p.isAfterDark && (
+            <span className="mr-1 rounded bg-stone-800 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-300">
+              After Dark
+            </span>
+          )}
+          {p.name}
+        </p>
+        <p className="text-xs text-stone-400">
+          {new Date(p.saleStartAt!).toLocaleString("en-PH", {
+            timeZone: "Asia/Manila",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })}{" "}
+          ·{" "}
+          <span className={kind === "up" ? "text-amber-300" : "text-emerald-400"}>
+            {relTime(p.saleStartAt!)}
+          </span>
+        </p>
+      </div>
+    </a>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-2xl bg-[#f6efdf] shadow-xl ring-1 ring-stone-900/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-stone-900/10 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-stone-900">📰 News &amp; updates</h2>
+            <p className="text-xs text-stone-500">
+              Hirono drop timing — live from Pop Mart PH’s schedule
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-stone-700"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="max-h-[68vh] space-y-5 overflow-y-auto p-4">
+          {/* Weekly cadence */}
+          <div className="rounded-xl bg-stone-900 p-3 text-stone-100">
+            <p className="text-sm font-semibold text-white">🗓️ Weekly drop</p>
+            <p className="mt-0.5 text-xs text-stone-300">
+              Pop Mart PH releases new items every <b>Friday</b>.{" "}
+              {isToday ? (
+                <span className="text-amber-300">Today is drop day! 🎉</span>
+              ) : (
+                <>
+                  Next Friday: <b className="text-white">{friLabel}</b>.
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* Upcoming */}
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-stone-900">
+              ⏳ Upcoming Hirono drops
+            </h3>
+            {upcoming.length ? (
+              <div className="space-y-2">{upcoming.map((p) => row(p, "up"))}</div>
+            ) : (
+              <p className="rounded-lg bg-[#efe7d3] p-3 text-xs text-stone-600 ring-1 ring-stone-900/10">
+                No Hirono items are pre-scheduled in the PH store right now. New
+                series usually appear here 1–2 weeks before launch — and you’ll get a
+                Telegram ping the moment any of them go live.
+              </p>
+            )}
+          </div>
+
+          {/* Recently launched */}
+          <div>
+            <h3 className="mb-2 text-sm font-bold text-stone-900">
+              🆕 Recently launched (last 14 days)
+            </h3>
+            {recent.length ? (
+              <div className="space-y-2">{recent.map((p) => row(p, "recent"))}</div>
+            ) : (
+              <p className="rounded-lg bg-[#efe7d3] p-3 text-xs text-stone-600 ring-1 ring-stone-900/10">
+                Nothing launched in the last two weeks.
+              </p>
+            )}
+          </div>
+
+          {/* Good to know */}
+          <div className="rounded-lg bg-[#efe7d3] p-3 text-[11px] leading-relaxed text-stone-600 ring-1 ring-stone-900/10">
+            <b>Good to know:</b> Hirono sells out fast — for hot drops, use POP NOW at
+            launch or pre-order. Major collabs are usually teased ~quarterly and drop
+            4–6 weeks later. For teasers before they hit the store, follow{" "}
+            <a
+              className="underline"
+              href="https://www.instagram.com/hirono_lang/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              @hirono_lang
+            </a>{" "}
+            and{" "}
+            <a
+              className="underline"
+              href="https://www.popmart.com/ph/collection/21/hirono"
+              target="_blank"
+              rel="noreferrer"
+            >
+              the PH Hirono page
+            </a>
+            .
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
