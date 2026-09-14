@@ -104,7 +104,6 @@ export default function Dashboard({
   const [logLoading, setLogLoading] = useState(false);
   const [showHelper, setShowHelper] = useState(false);
   const [showNews, setShowNews] = useState(false);
-  const [view, setView] = useState<"grid" | "list">("grid");
   const [activeIp, setActiveIp] = useState(initial?.keyword || "Hirono");
   const [watched, setWatched] = useState<string[]>([initial?.keyword || "Hirono"]);
   const [allIps, setAllIps] = useState<string[]>([]);
@@ -134,16 +133,7 @@ export default function Dashboard({
       .then((r) => r.json())
       .then((j) => Array.isArray(j.ips) && setAllIps(j.ips))
       .catch(() => {});
-    const v = localStorage.getItem("viewMode");
-    if (v === "grid" || v === "list") setView(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const changeView = useCallback((v: "grid" | "list") => {
-    setView(v);
-    try {
-      localStorage.setItem("viewMode", v);
-    } catch {}
   }, []);
 
   const saveWatched = useCallback((list: string[]) => {
@@ -433,29 +423,9 @@ export default function Dashboard({
           value={avail}
           onChange={(v) => setAvail(v as AvailFilter)}
         />
-        <div className="ml-auto flex items-center gap-3">
-          <div className="inline-flex rounded-lg bg-[#e7dcc4] p-0.5 ring-1 ring-stone-900/15">
-            <button
-              onClick={() => changeView("grid")}
-              title="Grid view"
-              className={`rounded-md px-2 py-1 text-sm font-medium transition ${
-                view === "grid" ? "bg-stone-900 text-white" : "text-stone-600"
-              }`}
-            >
-              ▦ Grid
-            </button>
-            <button
-              onClick={() => changeView("list")}
-              title="List view"
-              className={`rounded-md px-2 py-1 text-sm font-medium transition ${
-                view === "list" ? "bg-stone-900 text-white" : "text-stone-600"
-              }`}
-            >
-              ▤ List
-            </button>
-          </div>
-          <span className="text-sm text-stone-500">{filtered.length} shown</span>
-        </div>
+        <span className="ml-auto text-sm text-stone-500">
+          {filtered.length} shown
+        </span>
       </div>
 
       {data && filtered.length === 0 && (
@@ -464,20 +434,10 @@ export default function Dashboard({
         </p>
       )}
 
-      <div
-        className={
-          view === "list"
-            ? "flex flex-col gap-3"
-            : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-        }
-      >
+      {/* Responsive: horizontal rows on phones, grid cards on sm+ screens. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.map((p) => (
-          <Card
-            key={p.id}
-            p={p}
-            view={view}
-            justRestocked={restocked.includes(p.id)}
-          />
+          <Card key={p.id} p={p} justRestocked={restocked.includes(p.id)} />
         ))}
       </div>
 
@@ -1331,31 +1291,19 @@ function Segment<T extends string>({
   );
 }
 
-function Card({
-  p,
-  justRestocked,
-  view = "grid",
-}: {
-  p: Product;
-  justRestocked: boolean;
-  view?: "grid" | "list";
-}) {
+function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
   const meta = AVAIL_META[p.availability];
-  const list = view === "list";
+  // Layout is responsive: horizontal row on phones (<640px), vertical card on sm+.
   return (
     <a
       href={p.url}
       target="_blank"
       rel="noreferrer"
-      className={`group relative overflow-hidden rounded-xl bg-[#f6efdf] ring-1 transition hover:ring-stone-900/35 ${
+      className={`group relative flex overflow-hidden rounded-xl bg-[#f6efdf] ring-1 transition hover:ring-stone-900/35 sm:flex-col ${
         p.isAfterDark ? "ring-stone-900/25" : "ring-stone-900/10"
-      } ${list ? "flex" : "flex flex-col"}`}
+      }`}
     >
-      <div
-        className={`relative shrink-0 overflow-hidden bg-[#e2d6bd] ${
-          list ? "w-28 self-stretch sm:w-44" : "aspect-square w-full"
-        }`}
-      >
+      <div className="relative w-28 shrink-0 self-stretch overflow-hidden bg-[#e2d6bd] sm:aspect-square sm:w-full sm:self-auto">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={p.image}
