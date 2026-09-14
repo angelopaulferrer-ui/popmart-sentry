@@ -419,6 +419,7 @@ export default function Dashboard({
             { k: "in_stock", label: "In stock" },
             { k: "low", label: "Low" },
             { k: "sold_out", label: "Sold out" },
+            { k: "upcoming", label: "Upcoming" },
           ]}
           value={avail}
           onChange={(v) => setAvail(v as AvailFilter)}
