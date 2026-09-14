@@ -57,7 +57,10 @@ const AVAIL_META: Record<
 };
 
 type ScopeFilter = "all" | "afterdark";
-type AvailFilter = "all" | "low" | Availability;
+type AvailFilter = "all" | "low" | "latest" | "hot" | Availability;
+
+const hasTag = (p: Product, tag: string) =>
+  (p.tags || []).some((t) => t.toUpperCase() === tag);
 
 type RestockEvent = {
   at: string;
@@ -232,12 +235,23 @@ export default function Dashboard({
   const filtered = useMemo(() => {
     if (!data) return [];
     const hironoView = /hirono/i.test(activeIp);
-    return data.products.filter((p) => {
+    let list = data.products.filter((p) => {
       if (hironoView && scope === "afterdark" && !p.isAfterDark) return false;
       if (avail === "low") return isLowStock(p);
+      if (avail === "latest") return hasTag(p, "NEW");
+      if (avail === "hot") return hasTag(p, "HOT");
       if (avail !== "all" && p.availability !== avail) return false;
       return true;
     });
+    // Latest = newest releases first.
+    if (avail === "latest") {
+      list = [...list].sort(
+        (a, b) =>
+          (Date.parse(b.saleStartAt || "") || 0) -
+          (Date.parse(a.saleStartAt || "") || 0),
+      );
+    }
+    return list;
   }, [data, scope, avail, activeIp]);
 
   const t = data?.totals;
@@ -400,10 +414,11 @@ export default function Dashboard({
         <Segment
           options={[
             { k: "all", label: "Any" },
+            { k: "latest", label: "🆕 Latest" },
+            { k: "hot", label: "🔥 Hot" },
             { k: "in_stock", label: "In stock" },
             { k: "low", label: "⚡ Low" },
             { k: "sold_out", label: "Sold out" },
-            { k: "upcoming", label: "Upcoming" },
           ]}
           value={avail}
           onChange={(v) => setAvail(v as AvailFilter)}
