@@ -414,10 +414,10 @@ export default function Dashboard({
         <Segment
           options={[
             { k: "all", label: "Any" },
-            { k: "latest", label: "🆕 Latest" },
-            { k: "hot", label: "🔥 Hot" },
+            { k: "latest", label: "Latest" },
+            { k: "hot", label: "Hot" },
             { k: "in_stock", label: "In stock" },
-            { k: "low", label: "⚡ Low" },
+            { k: "low", label: "Low" },
             { k: "sold_out", label: "Sold out" },
           ]}
           value={avail}
