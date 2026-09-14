@@ -101,7 +101,12 @@ export default function Dashboard({
   const [logLoading, setLogLoading] = useState(false);
   const [showHelper, setShowHelper] = useState(false);
   const [showNews, setShowNews] = useState(false);
+  const [activeIp, setActiveIp] = useState(initial?.keyword || "Hirono");
+  const [watched, setWatched] = useState<string[]>([initial?.keyword || "Hirono"]);
+  const [allIps, setAllIps] = useState<string[]>([]);
+  const [showManage, setShowManage] = useState(false);
   const prevAvail = useRef<Map<string, Availability>>(new Map());
+  const baselineKw = useRef<string>(initial?.keyword || "Hirono");
 
   // Seed the previous-availability map from the first server render.
   useEffect(() => {
@@ -111,6 +116,29 @@ export default function Dashboard({
       );
     }
   }, [initial]);
+
+  // Load the saved IP watchlist (per-device) + the full IP roster for the picker.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("watchedIps") || "[]");
+      if (Array.isArray(saved) && saved.length) {
+        setWatched(saved);
+        if (!saved.includes(activeIp)) setActiveIp(saved[0]);
+      }
+    } catch {}
+    fetch("/api/ips")
+      .then((r) => r.json())
+      .then((j) => Array.isArray(j.ips) && setAllIps(j.ips))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveWatched = useCallback((list: string[]) => {
+    setWatched(list);
+    try {
+      localStorage.setItem("watchedIps", JSON.stringify(list));
+    } catch {}
+  }, []);
 
   const notify = useCallback(
     (p: Product) => {
@@ -124,41 +152,62 @@ export default function Dashboard({
     [alertsOn],
   );
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/scan?q=hirono", { cache: "no-store" });
-      if (!res.ok) throw new Error(`Scan failed (HTTP ${res.status})`);
-      const next = (await res.json()) as ScanResult;
+  const refresh = useCallback(
+    async (kw?: string) => {
+      const keyword = kw || activeIp;
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/scan?q=${encodeURIComponent(keyword)}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`Scan failed (HTTP ${res.status})`);
+        const next = (await res.json()) as ScanResult;
 
-      // Detect transitions into in_stock since the last scan.
-      const justRestocked: string[] = [];
-      for (const p of next.products) {
-        const before = prevAvail.current.get(p.id);
-        if (before && before !== "in_stock" && p.availability === "in_stock") {
-          justRestocked.push(p.id);
-          notify(p);
+        // Only diff for restocks when staying on the same IP (avoid cross-IP false flags).
+        const sameIp = baselineKw.current === keyword;
+        const justRestocked: string[] = [];
+        if (sameIp) {
+          for (const p of next.products) {
+            const before = prevAvail.current.get(p.id);
+            if (before && before !== "in_stock" && p.availability === "in_stock") {
+              justRestocked.push(p.id);
+              notify(p);
+            }
+          }
         }
+        prevAvail.current = new Map(
+          next.products.map((p) => [p.id, p.availability]),
+        );
+        baselineKw.current = keyword;
+        setRestocked(sameIp && justRestocked.length ? justRestocked : []);
+        setData(next);
+        setError(null);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setLoading(false);
       }
-      prevAvail.current = new Map(
-        next.products.map((p) => [p.id, p.availability]),
-      );
-      if (justRestocked.length) setRestocked(justRestocked);
-      setData(next);
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [notify]);
+    },
+    [notify, activeIp],
+  );
 
   // Auto-refresh loop.
   useEffect(() => {
     if (!auto) return;
-    const id = setInterval(refresh, REFRESH_MS);
+    const id = setInterval(() => refresh(), REFRESH_MS);
     return () => clearInterval(id);
   }, [auto, refresh]);
+
+  // Refetch when switching the active IP (skip the initial Hirono SSR render).
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      if (activeIp === (initial?.keyword || "Hirono")) return;
+    }
+    refresh(activeIp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIp]);
 
   const enableAlerts = useCallback(async () => {
     if (typeof Notification === "undefined") return;
@@ -182,19 +231,22 @@ export default function Dashboard({
 
   const filtered = useMemo(() => {
     if (!data) return [];
+    const hironoView = /hirono/i.test(activeIp);
     return data.products.filter((p) => {
-      if (scope === "afterdark" && !p.isAfterDark) return false;
+      if (hironoView && scope === "afterdark" && !p.isAfterDark) return false;
       if (avail === "low") return isLowStock(p);
       if (avail !== "all" && p.availability !== avail) return false;
       return true;
     });
-  }, [data, scope, avail]);
+  }, [data, scope, avail, activeIp]);
 
   const t = data?.totals;
   const lowCount = useMemo(
     () => (data ? data.products.filter(isLowStock).length : 0),
     [data],
   );
+  const isHirono = /hirono/i.test(activeIp);
+  const effScope: ScopeFilter = isHirono ? scope : "all";
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -213,7 +265,7 @@ export default function Dashboard({
             <h1 className="text-2xl font-bold tracking-tight">
               Popmart Sentry
               <span className="ml-2 rounded-full bg-stone-900/10 px-2 py-0.5 text-xs font-medium text-stone-800 ring-1 ring-stone-900/25">
-                Hirono · PH
+                {activeIp} · PH
               </span>
             </h1>
             <p className="mt-1 text-sm text-stone-600">
@@ -271,7 +323,7 @@ export default function Dashboard({
             🕒 Restock log
           </button>
           <button
-            onClick={refresh}
+            onClick={() => refresh()}
             disabled={loading}
             className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:opacity-50"
           >
@@ -280,6 +332,30 @@ export default function Dashboard({
         </div>
       </header>
 
+      {/* IP switcher */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-stone-500">Watching:</span>
+        {watched.map((ip) => (
+          <button
+            key={ip}
+            onClick={() => setActiveIp(ip)}
+            className={`rounded-full px-3 py-1 text-sm font-medium transition ${
+              ip === activeIp
+                ? "bg-stone-900 text-white"
+                : "bg-[#e7dcc4] text-stone-700 ring-1 ring-stone-900/15 hover:bg-[#dccbac]"
+            }`}
+          >
+            {ip}
+          </button>
+        ))}
+        <button
+          onClick={() => setShowManage(true)}
+          className="rounded-full border border-dashed border-stone-900/30 px-3 py-1 text-sm font-medium text-stone-600 hover:bg-[#e7dcc4]"
+        >
+          ＋ Add / manage IPs
+        </button>
+      </div>
+
       {error && (
         <div className="mb-4 rounded-lg bg-rose-500/10 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-500/30">
           Couldn’t reach Pop Mart: {error}
@@ -287,30 +363,40 @@ export default function Dashboard({
       )}
 
       {t && (
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Hirono products" value={t.products} />
+        <section
+          className={`mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 ${
+            isHirono ? "lg:grid-cols-6" : "lg:grid-cols-5"
+          }`}
+        >
+          <Stat label={`${activeIp} products`} value={t.products} />
           <Stat label="In stock" value={t.inStock} tone="emerald" />
           <Stat label="⚡ Low stock" value={lowCount} tone="amber" />
           <Stat label="Sold out" value={t.soldOut} tone="rose" />
           <Stat label="Upcoming" value={t.upcoming} tone="zinc" />
-          <Stat
-            label="After Dark in stock"
-            value={`${t.afterDarkInStock}/${t.afterDark}`}
-            tone="fuchsia"
-          />
+          {isHirono && (
+            <Stat
+              label="After Dark in stock"
+              value={`${t.afterDarkInStock}/${t.afterDark}`}
+              tone="fuchsia"
+            />
+          )}
         </section>
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Segment
-          options={[
-            { k: "all", label: "All Hirono" },
-            { k: "afterdark", label: "★ After Dark" },
-          ]}
-          value={scope}
-          onChange={(v) => setScope(v as ScopeFilter)}
-        />
-        <span className="mx-1 h-5 w-px bg-stone-900/15" />
+        {isHirono && (
+          <>
+            <Segment
+              options={[
+                { k: "all", label: "All Hirono" },
+                { k: "afterdark", label: "★ After Dark" },
+              ]}
+              value={scope}
+              onChange={(v) => setScope(v as ScopeFilter)}
+            />
+            <span className="mx-1 h-5 w-px bg-stone-900/15" />
+          </>
+        )}
         <Segment
           options={[
             { k: "all", label: "Any" },
@@ -360,7 +446,140 @@ export default function Dashboard({
           onClose={() => setShowNews(false)}
         />
       )}
+
+      {showManage && (
+        <ManageIpsModal
+          watched={watched}
+          allIps={allIps}
+          active={activeIp}
+          onSelect={(ip) => setActiveIp(ip)}
+          onSave={saveWatched}
+          onClose={() => setShowManage(false)}
+        />
+      )}
     </main>
+  );
+}
+
+// ---- Manage watched IPs ---------------------------------------------------
+
+function ManageIpsModal({
+  watched,
+  allIps,
+  active,
+  onSelect,
+  onSave,
+  onClose,
+}: {
+  watched: string[];
+  allIps: string[];
+  active: string;
+  onSelect: (ip: string) => void;
+  onSave: (list: string[]) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const add = (ip: string) => {
+    const name = ip.trim();
+    if (!name) return;
+    if (!watched.some((w) => w.toLowerCase() === name.toLowerCase()))
+      onSave([...watched, name]);
+    setQuery("");
+    onSelect(name);
+  };
+  const remove = (ip: string) => {
+    const list = watched.filter((w) => w !== ip);
+    onSave(list.length ? list : ["Hirono"]);
+    if (active === ip) onSelect((list[0] as string) || "Hirono");
+  };
+  const suggestions = allIps
+    .filter(
+      (ip) =>
+        ip.toLowerCase().includes(query.toLowerCase()) &&
+        !watched.some((w) => w.toLowerCase() === ip.toLowerCase()),
+    )
+    .slice(0, 8);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-16"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-2xl bg-[#f6efdf] shadow-xl ring-1 ring-stone-900/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-stone-900/10 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-stone-900">Watched IPs</h2>
+            <p className="text-xs text-stone-500">
+              Monitor any Pop Mart IP on this device.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-stone-700"
+          >
+            Done
+          </button>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <div className="flex flex-wrap gap-2">
+            {watched.map((ip) => (
+              <span
+                key={ip}
+                className="inline-flex items-center gap-1 rounded-full bg-[#e7dcc4] px-2.5 py-1 text-sm text-stone-800 ring-1 ring-stone-900/15"
+              >
+                {ip}
+                <button
+                  onClick={() => remove(ip)}
+                  className="text-stone-500 hover:text-rose-700"
+                  aria-label={`Remove ${ip}`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+
+          <div>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add(query)}
+              placeholder="Search an IP (e.g. SKULLPANDA) or type any name…"
+              className="w-full rounded-md bg-white p-2 text-sm text-stone-900 ring-1 ring-stone-900/15"
+            />
+            {query && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {suggestions.map((ip) => (
+                  <button
+                    key={ip}
+                    onClick={() => add(ip)}
+                    className="rounded-full bg-white px-2.5 py-1 text-xs text-stone-800 ring-1 ring-stone-900/15 hover:bg-stone-100"
+                  >
+                    ＋ {ip}
+                  </button>
+                ))}
+                <button
+                  onClick={() => add(query)}
+                  className="rounded-full bg-stone-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-stone-700"
+                >
+                  ＋ Add “{query.trim()}”
+                </button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-stone-500">
+            This controls what you <b>monitor on the dashboard</b> (saved to this
+            device). Telegram alerts follow a separate server list — tell me which IPs
+            to add there, or ask to enable self-service alert management.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

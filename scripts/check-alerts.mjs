@@ -16,6 +16,7 @@ const AREA = "PH";
 const KEYWORD = process.env.ALERT_KEYWORD || "hirono";
 const STATE_FILE = process.env.STATE_FILE || "data/hirono-state.json";
 const LOG_FILE = process.env.LOG_FILE || "data/restock-log.json";
+const WATCHLIST_FILE = process.env.WATCHLIST_FILE || "data/watchlist.json";
 const LOG_MAX = 300;
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
@@ -57,11 +58,11 @@ const phDate = (iso) =>
     hour12: true,
   });
 
-async function scan() {
+async function scan(keyword) {
   const items = [];
   for (let page = 1; page <= 10; page++) {
     const res = await rpc("search/public_search", {
-      q: KEYWORD,
+      q: keyword,
       page,
       pageSize: 50,
       isIncludePopNow: true,
@@ -193,8 +194,24 @@ async function sendTelegram(text) {
   else console.log("Telegram sent.");
 }
 
+async function loadWatchlist() {
+  try {
+    const raw = JSON.parse(await readFile(WATCHLIST_FILE, "utf8"));
+    const list = Array.isArray(raw) ? raw : raw?.notify;
+    const kws = (list ?? []).map((s) => String(s).trim()).filter(Boolean);
+    if (kws.length) return kws;
+  } catch {}
+  return [KEYWORD];
+}
+
 async function main() {
-  const products = await scan();
+  const keywords = await loadWatchlist();
+  // Scan every watched IP and merge (dedupe by product id).
+  const merged = new Map();
+  for (const kw of keywords) {
+    for (const p of await scan(kw)) merged.set(p.id, p);
+  }
+  const products = [...merged.values()];
   const prev = await loadState(); // { skuId: "in_stock" | "sold_out" }
   const nextState = variantStates(products);
 
@@ -206,7 +223,7 @@ async function main() {
     const afterDark = products.filter((p) => p.isAfterDark);
     const adIn = afterDark.filter(inStock).length;
     await sendTelegram(
-      `🤖 <b>Popmart Sentry</b> is now watching <b>${products.length}</b> Hirono products on Pop Mart PH.\n` +
+      `🤖 <b>Popmart Sentry</b> is now watching <b>${products.length}</b> products (${keywords.join(", ")}) on Pop Mart PH.\n` +
         `⭐ After Dark: ${adIn}/${afterDark.length} in stock right now.\n` +
         `You'll get a ping the moment anything restocks.`,
     );
