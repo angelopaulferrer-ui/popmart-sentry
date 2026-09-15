@@ -97,6 +97,8 @@ export default function Dashboard({
   const [loading, setLoading] = useState(false);
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [avail, setAvail] = useState<AvailFilter>("all");
+  const [query, setQuery] = useState("");
+  const [showSug, setShowSug] = useState(false);
   const [auto, setAuto] = useState(true);
   const [alertsOn, setAlertsOn] = useState(false);
   const [restocked, setRestocked] = useState<string[]>([]);
@@ -205,6 +207,8 @@ export default function Dashboard({
   // Refetch when switching the active IP (skip the initial Hirono SSR render).
   const firstRun = useRef(true);
   useEffect(() => {
+    setQuery("");
+    setShowSug(false);
     if (firstRun.current) {
       firstRun.current = false;
       if (activeIp === (initial?.keyword || "Hirono")) return;
@@ -240,6 +244,7 @@ export default function Dashboard({
       ? data
       : null;
 
+  const q = query.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (!activeData) return [];
     const hironoView = /hirono/i.test(activeIp);
@@ -251,6 +256,13 @@ export default function Dashboard({
       if (avail !== "all" && p.availability !== avail) return false;
       return true;
     });
+    if (q) {
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.variants.some((v) => v.name.toLowerCase().includes(q)),
+      );
+    }
     // Latest = newest releases first.
     if (avail === "latest") {
       list = [...list].sort(
@@ -260,7 +272,22 @@ export default function Dashboard({
       );
     }
     return list;
-  }, [activeData, scope, avail, activeIp]);
+  }, [activeData, scope, avail, activeIp, q]);
+
+  // Autocomplete suggestions from the current IP's product names.
+  const suggestions = useMemo(() => {
+    if (!activeData || !q) return [];
+    const seen = new Set<string>();
+    const out: Product[] = [];
+    for (const p of activeData.products) {
+      if (p.name.toLowerCase().includes(q) && !seen.has(p.name)) {
+        seen.add(p.name);
+        out.push(p);
+        if (out.length >= 7) break;
+      }
+    }
+    return out;
+  }, [activeData, q]);
 
   const t = activeData?.totals;
   const lowCount = useMemo(
@@ -388,7 +415,7 @@ export default function Dashboard({
 
       {t && (
         <section
-          className={`mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 ${
+          className={`mb-6 grid grid-cols-3 gap-2 sm:gap-3 ${
             isHirono ? "lg:grid-cols-6" : "lg:grid-cols-5"
           }`}
         >
@@ -406,6 +433,70 @@ export default function Dashboard({
           )}
         </section>
       )}
+
+      {/* Search within the active IP, with autocomplete suggestions */}
+      <div className="relative mb-3 max-w-md">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
+          🔍
+        </span>
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShowSug(true);
+          }}
+          onFocus={() => setShowSug(true)}
+          onBlur={() => setTimeout(() => setShowSug(false), 150)}
+          placeholder={`Search ${activeIp}…`}
+          className="w-full rounded-lg bg-white py-2 pl-9 pr-8 text-sm text-stone-900 ring-1 ring-stone-900/15 placeholder:text-stone-400 focus:outline-none focus:ring-stone-900/40"
+        />
+        {query && (
+          <button
+            onClick={() => {
+              setQuery("");
+              setShowSug(false);
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-1 text-stone-400 hover:text-stone-700"
+            aria-label="Clear search"
+          >
+            ✕
+          </button>
+        )}
+        {showSug && suggestions.length > 0 && (
+          <ul className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg bg-white py-1 shadow-lg ring-1 ring-stone-900/15">
+            {suggestions.map((p) => (
+              <li key={p.id}>
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setQuery(p.name);
+                    setShowSug(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-stone-800 hover:bg-stone-100"
+                >
+                  <Image
+                    src={p.image}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 shrink-0 rounded object-cover"
+                  />
+                  <span className="line-clamp-1 flex-1">{p.name}</span>
+                  <span
+                    className={`shrink-0 text-xs ${
+                      p.availability === "in_stock"
+                        ? "text-emerald-700"
+                        : "text-stone-400"
+                    }`}
+                  >
+                    {p.availability === "in_stock" ? `${p.stock} left` : "sold out"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="mb-4 flex items-center gap-3">
         <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
@@ -1205,7 +1296,7 @@ function RestockLogModal({
           <div>
             <h2 className="text-base font-bold text-stone-900">🕒 Restock log</h2>
             <p className="text-xs text-stone-500">
-              When Hirono items came back in stock (PH time)
+              When watched IPs came back in stock (PH time)
             </p>
           </div>
           <button
@@ -1220,8 +1311,9 @@ function RestockLogModal({
           {loading && <p className="p-6 text-center text-sm text-stone-500">Loading…</p>}
           {!loading && events && events.length === 0 && (
             <p className="p-6 text-center text-sm text-stone-500">
-              No restocks logged yet. Once an item comes back in stock, it’ll appear
-              here with the time — so you can spot Pop Mart’s drop patterns.
+              No restocks logged yet. Once any watched IP’s item comes back in
+              stock, it’ll appear here with the time — so you can spot Pop Mart’s
+              drop patterns.
             </p>
           )}
           {!loading && events && events.length > 0 && (
@@ -1286,9 +1378,9 @@ function Stat({
     fuchsia: "text-stone-800",
   };
   return (
-    <div className="rounded-xl bg-[#f6efdf] p-4 ring-1 ring-stone-900/10">
-      <div className={`text-2xl font-bold ${tones[tone]}`}>{value}</div>
-      <div className="mt-0.5 text-xs text-stone-600">{label}</div>
+    <div className="rounded-xl bg-[#f6efdf] p-3 ring-1 ring-stone-900/10 sm:p-4">
+      <div className={`text-xl font-bold sm:text-2xl ${tones[tone]}`}>{value}</div>
+      <div className="mt-0.5 text-[11px] text-stone-600 sm:text-xs">{label}</div>
     </div>
   );
 }
@@ -1341,11 +1433,6 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
           sizes="(max-width: 640px) 112px, (max-width: 1024px) 40vw, 25vw"
           className="object-cover transition group-hover:scale-105"
         />
-        {p.isAfterDark && (
-          <span className="absolute left-2 top-2 z-10 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-            After Dark
-          </span>
-        )}
         {justRestocked ? (
           <span className="absolute right-2 top-2 z-10 animate-pulse rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
             RESTOCKED
