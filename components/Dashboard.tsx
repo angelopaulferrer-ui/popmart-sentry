@@ -356,14 +356,14 @@ export default function Dashboard({
         </div>
       </header>
 
-      {/* IP switcher */}
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-stone-500">Watching:</span>
+      {/* IP switcher — horizontal scroll on overflow */}
+      <div className="no-scrollbar mb-5 flex items-center gap-2 overflow-x-auto">
+        <span className="shrink-0 text-xs font-medium text-stone-500">Watching:</span>
         {watched.map((ip) => (
           <button
             key={ip}
             onClick={() => setActiveIp(ip)}
-            className={`rounded-full px-3 py-1 text-sm font-medium transition ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-sm font-medium transition ${
               ip === activeIp
                 ? "bg-stone-900 text-white"
                 : "bg-[#e7dcc4] text-stone-700 ring-1 ring-stone-900/15 hover:bg-[#dccbac]"
@@ -374,7 +374,7 @@ export default function Dashboard({
         ))}
         <button
           onClick={() => setShowManage(true)}
-          className="rounded-full border border-dashed border-stone-900/30 px-3 py-1 text-sm font-medium text-stone-600 hover:bg-[#e7dcc4]"
+          className="shrink-0 whitespace-nowrap rounded-full border border-dashed border-stone-900/30 px-3 py-1 text-sm font-medium text-stone-600 hover:bg-[#e7dcc4]"
         >
           ＋ Add / manage IPs
         </button>
@@ -407,34 +407,36 @@ export default function Dashboard({
         </section>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {isHirono && (
-          <>
-            <Segment
-              options={[
-                { k: "all", label: "All Hirono" },
-                { k: "afterdark", label: "★ After Dark" },
-              ]}
-              value={scope}
-              onChange={(v) => setScope(v as ScopeFilter)}
-            />
-            <span className="mx-1 h-5 w-px bg-stone-900/15" />
-          </>
-        )}
-        <Segment
-          options={[
-            { k: "all", label: "Any" },
-            { k: "latest", label: "Latest" },
-            { k: "hot", label: "Hot" },
-            { k: "in_stock", label: "In stock" },
-            { k: "low", label: "Low" },
-            { k: "sold_out", label: "Sold out" },
-            { k: "upcoming", label: "Upcoming" },
-          ]}
-          value={avail}
-          onChange={(v) => setAvail(v as AvailFilter)}
-        />
-        <span className="ml-auto text-sm text-stone-500">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+          {isHirono && (
+            <>
+              <Segment
+                options={[
+                  { k: "all", label: "All Hirono" },
+                  { k: "afterdark", label: "★ After Dark" },
+                ]}
+                value={scope}
+                onChange={(v) => setScope(v as ScopeFilter)}
+              />
+              <span className="mx-1 h-5 w-px shrink-0 bg-stone-900/15" />
+            </>
+          )}
+          <Segment
+            options={[
+              { k: "all", label: "Any" },
+              { k: "latest", label: "Latest" },
+              { k: "hot", label: "Hot" },
+              { k: "in_stock", label: "In stock" },
+              { k: "low", label: "Low" },
+              { k: "sold_out", label: "Sold out" },
+              { k: "upcoming", label: "Upcoming" },
+            ]}
+            value={avail}
+            onChange={(v) => setAvail(v as AvailFilter)}
+          />
+        </div>
+        <span className="hidden shrink-0 text-sm text-stone-500 sm:block">
           {filtered.length} shown
         </span>
       </div>
@@ -1301,15 +1303,15 @@ function Segment<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg bg-[#e7dcc4] p-0.5 ring-1 ring-stone-900/15">
+    <div className="inline-flex shrink-0 rounded-lg bg-[#e7dcc4] p-0.5 ring-1 ring-stone-900/15">
       {options.map((o) => (
         <button
           key={o.k}
           onClick={() => onChange(o.k)}
-          className={`rounded-md px-3 py-1 text-sm font-medium transition ${
+          className={`whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition ${
             value === o.k
               ? "bg-stone-900 text-white"
-              : "text-stone-700 hover:text-white"
+              : "text-stone-700 hover:text-stone-900"
           }`}
         >
           {o.label}

@@ -8,6 +8,16 @@
   --ink: #1c1917;
 }
 
+/* Horizontal filter strips: scroll/drag on overflow, no visible scrollbar. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 html,
 body {
   background-color: var(--paper);
