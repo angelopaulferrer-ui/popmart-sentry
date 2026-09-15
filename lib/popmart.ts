@@ -123,23 +123,40 @@ export interface ScanResult {
 // Pop Mart's search q="" returns the WHOLE catalog (~700 items, ~7 pages). We
 // fetch it and filter by ipName — keyword search is fuzzy and leaks other IPs
 // (e.g. "THE MONSTERS" would pull in CRYBABY), whereas ipName is exact.
+// The catalog rarely changes, so cache it briefly (shared across IP switches)
+// and fetch the pages in parallel to keep scans fast.
+let _catalogCache: { at: number; items: SearchItem[] } | null = null;
+const CATALOG_TTL = 120_000;
+
 async function fetchCatalog(): Promise<SearchItem[]> {
-  const pageSize = 100;
-  const all: SearchItem[] = [];
-  let total = Infinity;
-  for (let page = 1; page <= 30; page++) {
-    const res = await rpc<SearchResponse>("search/public_search", {
-      q: "",
-      page,
-      pageSize,
-      isIncludePopNow: true,
-    });
-    const items = res?.items ?? [];
-    all.push(...items);
-    total = res?.total ?? total;
-    if (items.length < pageSize || all.length >= total) break;
+  if (_catalogCache && Date.now() - _catalogCache.at < CATALOG_TTL) {
+    return _catalogCache.items;
   }
-  return all;
+  const pageSize = 100;
+  const first = await rpc<SearchResponse>("search/public_search", {
+    q: "",
+    page: 1,
+    pageSize,
+    isIncludePopNow: true,
+  });
+  const items: SearchItem[] = [...(first?.items ?? [])];
+  const total = first?.total ?? items.length;
+  const pages = Math.min(30, Math.ceil(total / pageSize));
+  if (pages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: pages - 1 }, (_, i) =>
+        rpc<SearchResponse>("search/public_search", {
+          q: "",
+          page: i + 2,
+          pageSize,
+          isIncludePopNow: true,
+        }),
+      ),
+    );
+    for (const r of rest) items.push(...(r?.items ?? []));
+  }
+  _catalogCache = { at: Date.now(), items };
+  return items;
 }
 
 function deriveSeries(name: string): string {
@@ -214,7 +231,7 @@ export async function scanIp(ip = "Hirono"): Promise<ScanResult> {
 
   // Resolve stock detail for each product with limited concurrency.
   const products: Product[] = [];
-  const CONCURRENCY = 6;
+  const CONCURRENCY = 12;
   for (let i = 0; i < items.length; i += CONCURRENCY) {
     const batch = items.slice(i, i + CONCURRENCY);
     const resolved = await Promise.all(

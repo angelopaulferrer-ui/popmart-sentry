@@ -233,10 +233,17 @@ export default function Dashboard({
     }
   }, []);
 
+  // Only treat data as "for this IP" when its keyword matches the active IP —
+  // avoids showing the previous IP's products under the new IP's label mid-scan.
+  const activeData =
+    data && data.keyword?.trim().toLowerCase() === activeIp.trim().toLowerCase()
+      ? data
+      : null;
+
   const filtered = useMemo(() => {
-    if (!data) return [];
+    if (!activeData) return [];
     const hironoView = /hirono/i.test(activeIp);
-    let list = data.products.filter((p) => {
+    let list = activeData.products.filter((p) => {
       if (hironoView && scope === "afterdark" && !p.isAfterDark) return false;
       if (avail === "low") return isLowStock(p);
       if (avail === "latest") return hasTag(p, "NEW");
@@ -253,12 +260,12 @@ export default function Dashboard({
       );
     }
     return list;
-  }, [data, scope, avail, activeIp]);
+  }, [activeData, scope, avail, activeIp]);
 
-  const t = data?.totals;
+  const t = activeData?.totals;
   const lowCount = useMemo(
-    () => (data ? data.products.filter(isLowStock).length : 0),
-    [data],
+    () => (activeData ? activeData.products.filter(isLowStock).length : 0),
+    [activeData],
   );
   const isHirono = /hirono/i.test(activeIp);
   const effScope: ScopeFilter = isHirono ? scope : "all";
@@ -285,11 +292,13 @@ export default function Dashboard({
             </h1>
             <p className="mt-1 text-sm text-stone-600">
             Live availability from popmart.com/ph ·{" "}
-            {data ? (
+            {loading && !activeData ? (
+              <span className="text-stone-500">scanning {activeIp}…</span>
+            ) : activeData ? (
               <>
                 updated{" "}
-                <time dateTime={data.scannedAt}>
-                  {new Date(data.scannedAt).toLocaleTimeString()}
+                <time dateTime={activeData.scannedAt}>
+                  {new Date(activeData.scannedAt).toLocaleTimeString()}
                 </time>
               </>
             ) : (
@@ -430,18 +439,35 @@ export default function Dashboard({
         </span>
       </div>
 
-      {data && filtered.length === 0 && (
+      {!activeData ? (
+        // Loading skeleton while (re)scanning the selected IP.
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex overflow-hidden rounded-xl bg-[#f6efdf] ring-1 ring-stone-900/10 sm:flex-col"
+            >
+              <div className="w-28 shrink-0 animate-pulse self-stretch bg-[#e2d6bd] sm:aspect-square sm:w-full" />
+              <div className="flex-1 space-y-2 p-3">
+                <div className="h-3 w-20 animate-pulse rounded bg-stone-300" />
+                <div className="h-3 w-40 animate-pulse rounded bg-stone-300" />
+                <div className="h-3 w-16 animate-pulse rounded bg-stone-300" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <p className="rounded-lg bg-[#e7dcc4]/60 px-4 py-8 text-center text-sm text-stone-600">
           No products match this filter.
         </p>
+      ) : (
+        // Responsive: horizontal rows on phones, grid cards on sm+ screens.
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((p) => (
+            <Card key={p.id} p={p} justRestocked={restocked.includes(p.id)} />
+          ))}
+        </div>
       )}
-
-      {/* Responsive: horizontal rows on phones, grid cards on sm+ screens. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-        {filtered.map((p) => (
-          <Card key={p.id} p={p} justRestocked={restocked.includes(p.id)} />
-        ))}
-      </div>
 
       <footer className="mt-10 text-center text-xs text-stone-500">
         Unofficial monitor. Stock reflects Pop Mart’s reported inventory and may
