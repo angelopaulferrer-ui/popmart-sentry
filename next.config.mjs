@@ -1,12 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "prod-apac-r2.popmart.com" },
-      { protocol: "https", hostname: "prod-server-r2.popmart.com" },
-      { protocol: "https", hostname: "cdn-apac-static.popmart.com" },
-      { protocol: "https", hostname: "cdn-global.popmart.com" },
-    ],
+    // Optimize + edge-cache Pop Mart images through our own /_next/image endpoint.
+    remotePatterns: [{ protocol: "https", hostname: "**.popmart.com" }],
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86400, // keep optimized copies at the edge for a day
   },
 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import type { ScanResult, Product, Availability } from "@/lib/popmart";
 
 const REFRESH_MS = 60_000;
@@ -659,12 +660,12 @@ function NewsModal({
       rel="noreferrer"
       className="flex items-center gap-3 rounded-lg bg-stone-950 p-2.5 text-stone-100 hover:bg-stone-900"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={p.image}
         alt=""
+        width={48}
+        height={48}
         className="h-12 w-12 shrink-0 rounded object-cover"
-        loading="lazy"
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-white">
@@ -1305,12 +1306,12 @@ function Card({ p, justRestocked }: { p: Product; justRestocked: boolean }) {
       }`}
     >
       <div className="relative w-28 shrink-0 self-stretch overflow-hidden bg-[#e2d6bd] sm:aspect-square sm:w-full sm:self-auto">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={p.image}
           alt={p.name}
-          loading="lazy"
-          className="h-full w-full object-cover transition group-hover:scale-105"
+          fill
+          sizes="(max-width: 640px) 112px, (max-width: 1024px) 40vw, 25vw"
+          className="object-cover transition group-hover:scale-105"
         />
         {p.isAfterDark && (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
