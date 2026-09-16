@@ -1,0 +1,284 @@
+[
+  {
+    "id": "seed_carousell_1",
+    "name": "MNL Blindbox Corner",
+    "handle": "@mnlblindbox",
+    "platform": "carousell",
+    "profileUrl": "https://www.carousell.ph/search/hirono",
+    "location": "Metro Manila, PH",
+    "sellerType": "reseller",
+    "contact": {
+      "shopUrl": "https://www.carousell.ph/search/hirono"
+    },
+    "listings": [
+      {
+        "title": "Hirono After Dark Series — sealed box",
+        "series": "After Dark",
+        "priceMin": 620,
+        "priceMax": 780,
+        "currency": "PHP",
+        "url": "https://www.carousell.ph/p/example-1",
+        "inStock": true
+      },
+      {
+        "title": "Hirono City of Night — single blind box",
+        "series": "City of Night",
+        "priceMin": 540,
+        "priceMax": 600,
+        "currency": "PHP",
+        "inStock": true
+      }
+    ],
+    "signals": {
+      "accountAgeMonths": 28,
+      "followers": 3400,
+      "ratingCount": 210,
+      "ratingAvg": 4.9,
+      "marketplaceVerified": true,
+      "completedSales": 640,
+      "responseRate": 0.95,
+      "hasReturnPolicy": true
+    },
+    "trustScore": 0,
+    "trustLevel": "unrated",
+    "source": "manual",
+    "status": "live",
+    "addedAt": "2026-09-15T00:00:00.000Z",
+    "notes": "SAMPLE seed entry — replace with aggregated/submitted data."
+  },
+  {
+    "id": "seed_shopee_1",
+    "name": "Popmart PH Supplier Hub",
+    "handle": "popmartsupplierhub",
+    "platform": "shopee",
+    "profileUrl": "https://shopee.ph/search?keyword=hirono",
+    "location": "Quezon City, PH",
+    "sellerType": "supplier",
+    "contact": {
+      "shopUrl": "https://shopee.ph/search?keyword=hirono"
+    },
+    "listings": [
+      {
+        "title": "Hirono After Dark — full set (6) preorder",
+        "series": "After Dark",
+        "priceMin": 3600,
+        "priceMax": 3900,
+        "currency": "PHP",
+        "inStock": false
+      }
+    ],
+    "signals": {
+      "accountAgeMonths": 41,
+      "followers": 18200,
+      "ratingCount": 2400,
+      "ratingAvg": 4.8,
+      "marketplaceVerified": true,
+      "completedSales": 5200,
+      "responseRate": 0.9,
+      "hasReturnPolicy": true
+    },
+    "trustScore": 0,
+    "trustLevel": "unrated",
+    "source": "manual",
+    "status": "live",
+    "addedAt": "2026-09-15T00:00:00.000Z",
+    "notes": "SAMPLE seed entry — Shopee Preferred/Mall style supplier."
+  },
+  {
+    "id": "seed_ig_1",
+    "name": "Little Mischief Finds",
+    "handle": "@littlemischief.finds",
+    "platform": "instagram",
+    "profileUrl": "https://instagram.com/example.littlemischief.finds",
+    "location": "Cebu City, PH",
+    "sellerType": "reseller",
+    "contact": {
+      "messenger": "https://ig.me/m/example.littlemischief.finds",
+      "viber": "+63 900 000 0000"
+    },
+    "listings": [
+      {
+        "title": "Hirono Little Mischief — secured pieces",
+        "series": "Little Mischief",
+        "priceMin": 700,
+        "priceMax": 950,
+        "currency": "PHP",
+        "inStock": true
+      }
+    ],
+    "signals": {
+      "accountAgeMonths": 14,
+      "followers": 5200,
+      "ratingCount": 0,
+      "marketplaceVerified": false,
+      "responseRate": 0.8
+    },
+    "trustScore": 0,
+    "trustLevel": "unrated",
+    "source": "submission",
+    "status": "live",
+    "addedAt": "2026-09-15T00:00:00.000Z",
+    "notes": "SAMPLE — IG seller, no marketplace ratings so scores lower on purpose."
+  },
+  {
+    "id": "seed_ebay_1",
+    "name": "AsiaToys Export",
+    "handle": "asiatoys-export",
+    "platform": "ebay",
+    "profileUrl": "https://www.ebay.com/sch/i.html?_nkw=hirono",
+    "location": "Ships to PH",
+    "sellerType": "supplier",
+    "contact": {
+      "shopUrl": "https://www.ebay.com/sch/i.html?_nkw=hirono"
+    },
+    "listings": [
+      {
+        "title": "Hirono Mime Series — authentic, sealed",
+        "series": "Mime",
+        "priceMin": 1100,
+        "priceMax": 1400,
+        "currency": "PHP",
+        "inStock": true
+      }
+    ],
+    "signals": {
+      "accountAgeMonths": 60,
+      "ratingCount": 8900,
+      "ratingAvg": 4.95,
+      "marketplaceVerified": true,
+      "completedSales": 12000,
+      "responseRate": 0.88,
+      "hasReturnPolicy": true
+    },
+    "trustScore": 0,
+    "trustLevel": "unrated",
+    "source": "aggregated",
+    "status": "live",
+    "addedAt": "2026-09-15T00:00:00.000Z",
+    "notes": "SAMPLE — high-volume eBay top-rated seller."
+  },
+  {
+    "id": "seed_fb_1",
+    "name": "Hirono Hoard PH",
+    "handle": "hironohoardph",
+    "platform": "facebook",
+    "profileUrl": "https://facebook.com/example.hironohoardph",
+    "location": "Davao City, PH",
+    "sellerType": "preorder",
+    "contact": {
+      "messenger": "https://m.me/example.hironohoardph"
+    },
+    "listings": [
+      {
+        "title": "Hirono After Dark — GO preorder, batch arriving",
+        "series": "After Dark",
+        "priceMin": 580,
+        "priceMax": 650,
+        "currency": "PHP",
+        "inStock": false
+      }
+    ],
+    "signals": {
+      "accountAgeMonths": 9,
+      "followers": 1200,
+      "ratingCount": 0,
+      "marketplaceVerified": false,
+      "responseRate": 0.7
+    },
+    "trustScore": 0,
+    "trustLevel": "unrated",
+    "source": "submission",
+    "status": "live",
+    "addedAt": "2026-09-15T00:00:00.000Z",
+    "notes": "SAMPLE — new FB preorder page, low signals (borderline)."
+  },
+  {
+    "id": "seed_lowtrust_1",
+    "name": "cheap hirono legit!!",
+    "handle": "cheaphirono2026",
+    "platform": "facebook",
+    "profileUrl": "https://facebook.com/example.cheaphirono2026",
+    "location": "unknown",
+    "sellerType": "unknown",
+    "contact": {
+      "messenger": "https://m.me/example.cheaphirono2026"
+    },
+    "listings": [
+      {
+        "title": "Hirono After Dark 50% OFF DM to order",
+        "series": "After Dark",
+        "priceMin": 250,
+        "priceMax": 300,
+        "currency": "PHP",
+        "inStock": true
+      }
+    ],
+    "signals": {
+      "accountAgeMonths": 1,
+      "followers": 80,
+      "ratingCount": 0,
+      "marketplaceVerified": false,
+      "responseRate": 0.3
+    },
+    "trustScore": 0,
+    "trustLevel": "caution",
+    "source": "aggregated",
+    "status": "live",
+    "addedAt": "2026-09-15T00:00:00.000Z",
+    "notes": "SAMPLE — deliberately low-trust: brand-new page, suspiciously cheap. Auto-hidden by getLiveSellers()."
+  },
+  {
+    "name": "853435423440488",
+    "handle": "@853435423440488",
+    "platform": "facebook",
+    "profileUrl": "https://www.facebook.com/groups/853435423440488",
+    "sellerType": "unknown",
+    "contact": {
+      "shopUrl": "https://www.facebook.com/groups/853435423440488"
+    },
+    "listings": [
+      {
+        "title": "Hirono",
+        "currency": "PHP",
+        "url": "https://www.facebook.com/groups/853435423440488",
+        "inStock": true
+      }
+    ],
+    "signals": {},
+    "source": "submission",
+    "notes": "Imported from Facebook post via paste importer.",
+    "id": "imp_mu31bhir_7",
+    "trustScore": 0,
+    "trustLevel": "caution",
+    "status": "pending",
+    "addedAt": "2026-09-15T18:58:14.259Z",
+    "lastSeen": "2026-09-15T18:58:14.259Z"
+  },
+  {
+    "name": "586625873889976",
+    "handle": "@586625873889976",
+    "platform": "facebook",
+    "profileUrl": "https://www.facebook.com/groups/586625873889976",
+    "sellerType": "unknown",
+    "contact": {
+      "shopUrl": "https://www.facebook.com/groups/586625873889976"
+    },
+    "listings": [
+      {
+        "title": "Hirono",
+        "currency": "PHP",
+        "url": "https://www.facebook.com/groups/586625873889976",
+        "inStock": true
+      }
+    ],
+    "signals": {},
+    "source": "submission",
+    "notes": "Imported from Facebook post via paste importer.",
+    "id": "imp_mu31ct49_8",
+    "trustScore": 0,
+    "trustLevel": "caution",
+    "status": "pending",
+    "addedAt": "2026-09-15T18:59:15.944Z",
+    "lastSeen": "2026-09-15T18:59:15.944Z"
+  }
+]

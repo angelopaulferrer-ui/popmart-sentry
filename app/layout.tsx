@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ScrollToTop from "@/components/ScrollToTop";
 
 export const metadata: Metadata = {
   title: "Popmart Sentry — Hirono Watch (PH)",
@@ -14,7 +15,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">{children}</body>
+      {/* suppressHydrationWarning: browser extensions (ColorZilla, Grammarly, etc.)
+          inject attributes like cz-shortcut-listen onto <body> before React hydrates,
+          which is harmless but trips the hydration mismatch warning. */}
+      <body className="min-h-screen antialiased" suppressHydrationWarning>
+        {children}
+        <ScrollToTop />
+      </body>
     </html>
   );
 }
