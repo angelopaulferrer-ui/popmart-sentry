@@ -146,6 +146,22 @@ export default function Dashboard({
     } catch {}
   }, []);
 
+  const removeIp = useCallback(
+    (ip: string) => {
+      if (!confirm(`Stop watching "${ip}"?`)) return;
+      setWatched((prev) => {
+        const list = prev.filter((w) => w !== ip);
+        const next = list.length ? list : ["Hirono"];
+        try {
+          localStorage.setItem("watchedIps", JSON.stringify(next));
+        } catch {}
+        setActiveIp((cur) => (cur === ip ? next[0] : cur));
+        return next;
+      });
+    },
+    [],
+  );
+
   const notify = useCallback(
     (p: Product) => {
       if (!alertsOn || typeof Notification === "undefined") return;
@@ -386,19 +402,37 @@ export default function Dashboard({
       {/* IP switcher — horizontal scroll on overflow */}
       <div className="no-scrollbar mb-5 flex items-center gap-2 overflow-x-auto">
         <span className="shrink-0 text-xs font-medium text-stone-500">Watching:</span>
-        {watched.map((ip) => (
-          <button
-            key={ip}
-            onClick={() => setActiveIp(ip)}
-            className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-sm font-medium transition ${
-              ip === activeIp
-                ? "bg-stone-900 text-white"
-                : "bg-[#e7dcc4] text-stone-700 ring-1 ring-stone-900/15 hover:bg-[#dccbac]"
-            }`}
-          >
-            {ip}
-          </button>
-        ))}
+        {watched.map((ip) => {
+          const active = ip === activeIp;
+          return (
+            <span
+              key={ip}
+              className={`flex shrink-0 items-center rounded-full text-sm font-medium ring-1 transition ${
+                active
+                  ? "bg-stone-900 text-white ring-stone-900"
+                  : "bg-[#e7dcc4] text-stone-700 ring-stone-900/15 hover:bg-[#dccbac]"
+              }`}
+            >
+              <button
+                onClick={() => setActiveIp(ip)}
+                className="whitespace-nowrap py-1 pl-3 pr-1.5"
+              >
+                {ip}
+              </button>
+              <button
+                onClick={() => removeIp(ip)}
+                aria-label={`Stop watching ${ip}`}
+                className={`mr-1 rounded-full px-1 text-xs leading-none ${
+                  active
+                    ? "text-white/60 hover:text-white"
+                    : "text-stone-400 hover:text-rose-700"
+                }`}
+              >
+                ✕
+              </button>
+            </span>
+          );
+        })}
         <button
           onClick={() => setShowManage(true)}
           className="shrink-0 whitespace-nowrap rounded-full border border-dashed border-stone-900/30 px-3 py-1 text-sm font-medium text-stone-600 hover:bg-[#e7dcc4]"
@@ -625,6 +659,7 @@ function ManageIpsModal({
     onSelect(name);
   };
   const remove = (ip: string) => {
+    if (!confirm(`Stop watching "${ip}"?`)) return;
     const list = watched.filter((w) => w !== ip);
     onSave(list.length ? list : ["Hirono"]);
     if (active === ip) onSelect((list[0] as string) || "Hirono");
