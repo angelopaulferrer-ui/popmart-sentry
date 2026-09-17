@@ -1,7 +1,9 @@
 name: Restock alerts (Hirono / After Dark)
 
-# GitHub's scheduler floor is 5 min, so to poll every ~60s we trigger every
-# 5 min and loop 5 checks (t=0,1,2,3,4) inside one job. Public repo => free Actions.
+# GitHub's scheduler is unreliable for frequent crons — it fires this every few
+# HOURS, not every 5 min. So each run self-loops for ~5 hours polling every 60s,
+# committing the log/state on change. With concurrency, when one long run ends the
+# next queued schedule takes over → near-continuous coverage. Public repo => free.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -17,7 +19,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 320
     steps:
       - uses: actions/checkout@v4
 
@@ -25,35 +27,24 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Poll Pop Mart PH every 60 seconds
+      - name: Poll Pop Mart PH every 60s for ~5 hours, commit on change
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ALERT_KEYWORD: hirono
         run: |
-          for i in 1 2 3 4 5; do
-            echo "::group::check $i"
-            node scripts/check-alerts.mjs || true
-            echo "::endgroup::"
-            if [ "$i" -lt 5 ]; then sleep 60; fi
-          done
-
-      - name: Commit state + restock log (if any)
-        run: |
           git config user.name "popmart-sentry-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add data/
-          if git diff --cached --quiet; then
-            echo "No state change."
-            exit 0
-          fi
-          git commit -m "chore: update stock state + restock log [skip ci]"
-          # Commit first, then rebase onto any concurrent pushes and retry — so the
-          # restock log/state reliably persist even when main moved (code pushes).
-          for i in 1 2 3 4 5; do
-            if git pull --rebase --autostash origin main && git push; then
-              echo "pushed on attempt $i"; exit 0
+          END=$((SECONDS + 18000))   # ~5 hours
+          while [ "$SECONDS" -lt "$END" ]; do
+            node scripts/check-alerts.mjs || true
+            if [ -n "$(git status --porcelain data/)" ]; then
+              git add data/
+              git commit -m "chore: update stock state + restock log [skip ci]" || true
+              for i in 1 2 3; do
+                if git pull --rebase --autostash origin main && git push; then break; fi
+                sleep 3
+              done
             fi
-            echo "push retry $i…"; sleep 3
+            sleep 60
           done
-          echo "WARN: could not push data updates after retries"
