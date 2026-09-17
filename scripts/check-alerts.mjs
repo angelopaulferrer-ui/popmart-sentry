@@ -117,6 +117,7 @@ async function resolveItems(items) {
     return {
       id: it.id,
       name: it.name,
+      ip: (it.ipName || "").toLowerCase(),
       price: it.price,
       saleStartAt: saleStartAt ?? null,
       isAfterDark: /after\s*dark/i.test(it.name),
@@ -219,8 +220,26 @@ async function main() {
     (it) => it.channel === "shop" && targets.has((it.ipName ?? "").toLowerCase()),
   );
   const products = await resolveItems(items);
-  const prev = await loadState(); // { skuId: "in_stock" | "sold_out" }
+
+  // State is { skuId: status, __watchlist: [keywords] }. We NEVER wipe it on
+  // config changes — that used to swallow restocks. Instead we track which IPs
+  // were watched last run and only silently seed newly-added IPs.
+  const prevRaw = await loadState();
+  let prev = null;
+  let prevWatchlist = [];
+  if (prevRaw) {
+    prevWatchlist = Array.isArray(prevRaw.__watchlist)
+      ? prevRaw.__watchlist.map((k) => String(k).toLowerCase())
+      : [];
+    prev = { ...prevRaw };
+    delete prev.__watchlist;
+  }
+  const newlyAddedIps = new Set(
+    [...targets].filter((k) => !prevWatchlist.includes(k)),
+  );
+
   const nextState = variantStates(products);
+  nextState.__watchlist = keywords;
 
   const inStock = (p) => p.variants.some((v) => v.stock > 0);
 
@@ -266,9 +285,13 @@ async function main() {
   }
 
   // New-listing alerts: products whose variants are ALL unseen since last scan —
-  // i.e. a brand-new Hirono item just appeared in the catalog (a drop got scheduled).
+  // a genuinely new item appeared. Suppress items from IPs just added to the
+  // watchlist (their back-catalog is "new" only to us) — silently seed instead.
   const newListings = products.filter(
-    (p) => p.variants.length && p.variants.every((v) => prev[v.skuId] === undefined),
+    (p) =>
+      p.variants.length &&
+      p.variants.every((v) => prev[v.skuId] === undefined) &&
+      !newlyAddedIps.has(p.ip),
   );
   newListings.sort((a, b) => Number(b.isAfterDark) - Number(a.isAfterDark));
   for (const p of newListings.slice(0, 8)) {
@@ -277,7 +300,7 @@ async function main() {
     if (p.saleStartAt && Date.parse(p.saleStartAt) > Date.now())
       when = `drops ${phDate(p.saleStartAt)}`;
     await sendTelegram(
-      `🆕 <b>NEW Hirono listing — Pop Mart PH</b>\n` +
+      `🆕 <b>NEW listing — Pop Mart PH</b>\n` +
         `${flag}${esc(p.name)}\n` +
         `${peso(p.price)} · ${when}\n` +
         `${p.url}`,
@@ -301,12 +324,11 @@ async function main() {
     })),
   );
 
-  const changed = JSON.stringify(prev) !== JSON.stringify(nextState);
-  if (changed) await saveState(nextState);
+  // Always persist (git will no-op if the file content is identical).
+  await saveState(nextState);
   console.log(
-    `Scan done. ${products.length} products, ${events.length} restock alert(s), state ${
-      changed ? "updated" : "unchanged"
-    }.`,
+    `Scan done. ${products.length} products, ${events.length} restock alert(s), ` +
+      `${newlyAddedIps.size ? `seeded new IPs: ${[...newlyAddedIps].join(", ")}` : "no new IPs"}.`,
   );
 }
 
