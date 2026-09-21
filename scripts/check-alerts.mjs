@@ -148,6 +148,16 @@ function variantStates(products) {
   return map;
 }
 
+// Stable identity for a product so re-listings (Pop Mart re-mints a page with
+// brand-new SPU/SKU ids for the SAME item) don't read as "new". Normalises the
+// name: lowercase, strip punctuation, collapse whitespace.
+function productKey(p) {
+  return String(p.name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 async function loadState() {
   try {
     return JSON.parse(await readFile(STATE_FILE, "utf8"));
@@ -227,21 +237,36 @@ async function main() {
   const prevRaw = await loadState();
   let prev = null;
   let prevWatchlist = [];
+  let prevSeenKeys = new Set();
   if (prevRaw) {
     prevWatchlist = Array.isArray(prevRaw.__watchlist)
       ? prevRaw.__watchlist.map((k) => String(k).toLowerCase())
       : [];
+    prevSeenKeys = new Set(
+      Array.isArray(prevRaw.__seenKeys) ? prevRaw.__seenKeys : [],
+    );
     prev = { ...prevRaw };
     delete prev.__watchlist;
+    delete prev.__seenKeys;
   }
+  // Migration: an existing state file predating __seenKeys. Seed the name set
+  // this run WITHOUT firing new-listing pings (else the whole current catalog
+  // reads as "new"). Restock detection still runs normally.
+  const seedingSeenKeys = !!prevRaw && !Array.isArray(prevRaw.__seenKeys);
   const newlyAddedIps = new Set(
     [...targets].filter((k) => !prevWatchlist.includes(k)),
   );
 
+  const inStock = (p) => p.variants.some((v) => v.stock > 0);
+
+  // Union of every product name we've ever seen — so a re-minted page for a
+  // known item never re-triggers a "new listing". Grows monotonically.
+  const seenKeys = new Set(prevSeenKeys);
+  for (const p of products) seenKeys.add(productKey(p));
+
   const nextState = variantStates(products);
   nextState.__watchlist = keywords;
-
-  const inStock = (p) => p.variants.some((v) => v.stock > 0);
+  nextState.__seenKeys = [...seenKeys];
 
   // First ever run: establish baseline, no per-item spam.
   if (!prev) {
@@ -284,25 +309,31 @@ async function main() {
     await sleep(1500);
   }
 
-  // New-listing alerts: products whose variants are ALL unseen since last scan —
-  // a genuinely new item appeared. Suppress items from IPs just added to the
-  // watchlist (their back-catalog is "new" only to us) — silently seed instead.
-  const newListings = products.filter(
-    (p) =>
-      p.variants.length &&
-      p.variants.every((v) => prev[v.skuId] === undefined) &&
-      !newlyAddedIps.has(p.ip),
-  );
+  // New-listing alerts: a product whose NAME we've never seen before — a
+  // genuinely new item, not Pop Mart re-minting a page (new SPU/SKU ids) for one
+  // we already track. We also require real, buyable stock: a fresh page with 0
+  // stock is not "on sale now", so we seed it silently and let the RESTOCK path
+  // ping when it actually flips in. Suppress IPs just added to the watchlist
+  // (their whole back-catalog is "new" only to us).
+  const newListings = seedingSeenKeys
+    ? []
+    : products.filter(
+        (p) =>
+          p.variants.length &&
+          !prevSeenKeys.has(productKey(p)) &&
+          !newlyAddedIps.has(p.ip) &&
+          !p.upcoming &&
+          inStock(p),
+      );
   newListings.sort((a, b) => Number(b.isAfterDark) - Number(a.isAfterDark));
   for (const p of newListings.slice(0, 8)) {
     const flag = p.isAfterDark ? "⭐ <b>AFTER DARK</b> " : "";
-    let when = "on sale now";
-    if (p.saleStartAt && Date.parse(p.saleStartAt) > Date.now())
-      when = `drops ${phDate(p.saleStartAt)}`;
+    const total = p.variants.reduce((a, v) => a + (v.stock || 0), 0);
+    const low = total <= 3 ? "⚡ only " : "";
     await sendTelegram(
       `🆕 <b>NEW listing — Pop Mart PH</b>\n` +
         `${flag}${esc(p.name)}\n` +
-        `${peso(p.price)} · ${when}\n` +
+        `${peso(p.price)} · on sale now · ${low}${total} left\n` +
         `${p.url}`,
     );
     console.log("Alerted new listing:", p.name);
