@@ -1,1 +1,4 @@
-["hirono","THE MONSTERS"]
+{
+  "notify": ["hirono", "THE MONSTERS"],
+  "names": ["harry potter"]
+}

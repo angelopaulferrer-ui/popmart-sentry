@@ -211,23 +211,39 @@ async function sendTelegram(text) {
   else console.log("Telegram sent.");
 }
 
+// Watchlist supports two match modes:
+//   notify: exact ipName matches (e.g. "hirono", "THE MONSTERS")
+//   names:  substring matches on the product NAME (e.g. "harry potter"), so a
+//           collab lands regardless of which ipName bucket Pop Mart files it under.
 async function loadWatchlist() {
+  const clean = (a) => (a ?? []).map((s) => String(s).trim()).filter(Boolean);
   try {
     const raw = JSON.parse(await readFile(WATCHLIST_FILE, "utf8"));
-    const list = Array.isArray(raw) ? raw : raw?.notify;
-    const kws = (list ?? []).map((s) => String(s).trim()).filter(Boolean);
-    if (kws.length) return kws;
+    if (Array.isArray(raw)) {
+      const ips = clean(raw);
+      if (ips.length) return { ips, names: [] };
+    } else {
+      const ips = clean(raw?.notify);
+      const names = clean(raw?.names);
+      if (ips.length || names.length) return { ips, names };
+    }
   } catch {}
-  return [KEYWORD];
+  return { ips: [KEYWORD], names: [] };
 }
 
 async function main() {
-  const keywords = await loadWatchlist();
+  const { ips: keywords, names: nameKeywords } = await loadWatchlist();
   const targets = new Set(keywords.map((k) => k.trim().toLowerCase()));
-  // Fetch the catalog once, filter to the watched IPs by exact ipName, then resolve.
+  const nameTargets = nameKeywords.map((k) => k.trim().toLowerCase());
+  const nameMatch = (name) =>
+    nameTargets.some((t) => String(name ?? "").toLowerCase().includes(t));
+  // Fetch the catalog once, filter to watched IPs (exact ipName) OR watched
+  // product-name substrings, then resolve.
   const catalog = await fetchCatalog();
   const items = catalog.filter(
-    (it) => it.channel === "shop" && targets.has((it.ipName ?? "").toLowerCase()),
+    (it) =>
+      it.channel === "shop" &&
+      (targets.has((it.ipName ?? "").toLowerCase()) || nameMatch(it.name)),
   );
   const products = await resolveItems(items);
 
@@ -237,16 +253,21 @@ async function main() {
   const prevRaw = await loadState();
   let prev = null;
   let prevWatchlist = [];
+  let prevNameWatch = [];
   let prevSeenKeys = new Set();
   if (prevRaw) {
     prevWatchlist = Array.isArray(prevRaw.__watchlist)
       ? prevRaw.__watchlist.map((k) => String(k).toLowerCase())
+      : [];
+    prevNameWatch = Array.isArray(prevRaw.__nameWatch)
+      ? prevRaw.__nameWatch.map((k) => String(k).toLowerCase())
       : [];
     prevSeenKeys = new Set(
       Array.isArray(prevRaw.__seenKeys) ? prevRaw.__seenKeys : [],
     );
     prev = { ...prevRaw };
     delete prev.__watchlist;
+    delete prev.__nameWatch;
     delete prev.__seenKeys;
   }
   // Migration: an existing state file predating __seenKeys. Seed the name set
@@ -256,6 +277,13 @@ async function main() {
   const newlyAddedIps = new Set(
     [...targets].filter((k) => !prevWatchlist.includes(k)),
   );
+  // A product was already in scope last run if its ipName was watched OR its
+  // name matched a name-watch term we already had. Products only NOW entering
+  // scope (a freshly-added IP or name term) get seeded silently — their whole
+  // back-catalog is "new" only to us, not genuinely new listings.
+  const scopedBefore = (p) =>
+    prevWatchlist.includes(p.ip) ||
+    prevNameWatch.some((t) => String(p.name ?? "").toLowerCase().includes(t));
 
   const inStock = (p) => p.variants.some((v) => v.stock > 0);
 
@@ -266,6 +294,7 @@ async function main() {
 
   const nextState = variantStates(products);
   nextState.__watchlist = keywords;
+  nextState.__nameWatch = nameKeywords;
   nextState.__seenKeys = [...seenKeys];
 
   // First ever run: establish baseline, no per-item spam.
@@ -321,7 +350,7 @@ async function main() {
         (p) =>
           p.variants.length &&
           !prevSeenKeys.has(productKey(p)) &&
-          !newlyAddedIps.has(p.ip) &&
+          scopedBefore(p) &&
           !p.upcoming &&
           inStock(p),
       );
