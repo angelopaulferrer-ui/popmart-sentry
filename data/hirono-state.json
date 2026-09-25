@@ -10,6 +10,8 @@
   "c8ad2b20-0238-4596-8d0e-74bcbd3da10b": "in_stock",
   "f499f6f6-9971-4756-bbed-1847a65b535f": "in_stock",
   "0209db3b-c092-4d34-bc34-f48e9d2afc52": "in_stock",
+  "30d30a49-8ac0-4ce2-aa3b-17c933479135": "in_stock",
+  "eb370d53-9542-44c0-8e04-821fc92c7de3": "in_stock",
   "88495513-4bcb-4e6d-bc24-977e39dd1679": "in_stock",
   "88f95448-87c4-4e9b-aa0d-30968220320c": "in_stock",
   "ad7437f5-5d31-445f-bbb9-f653d4374c68": "in_stock",
@@ -66,6 +68,7 @@
   "402f6756-85b2-443e-8f75-a082c7251942": "in_stock",
   "1488b9f3-7df1-440a-af35-fb85baf8ff69": "in_stock",
   "fac073df-2757-41b2-b31a-aa4e539df5b0": "in_stock",
+  "e920721a-36a3-40b4-a15e-1a81522f6c8a": "in_stock",
   "8ff04fc4-1bfb-4a05-8c2f-0cbcdbe64d02": "in_stock",
   "00b7f75b-c0ee-4baa-8c90-aa75731cf57d": "in_stock",
   "71def6b2-bea2-432b-8cc0-3a62952a099e": "in_stock",
@@ -120,6 +123,10 @@
   "b23463e9-5a00-42b8-a396-eb78ecd0b2cf": "in_stock",
   "cdb70686-ab01-427e-82f5-82ae9386a20d": "in_stock",
   "fab67307-920a-4dbb-86c6-fced4eb853c7": "in_stock",
+  "2f8e0fab-74e6-430c-8495-b1eb9a036fe9": "sold_out",
+  "ab399536-5d9f-42a2-9bc7-3628ece56f38": "in_stock",
+  "efad7724-b28b-4821-981d-d66e7d45912b": "in_stock",
+  "36e1b2bf-89e3-406f-98a5-58e214c927d7": "sold_out",
   "816888ac-eaf7-46aa-8ac7-863006df5929": "sold_out",
   "71f24f3a-39e5-4bf9-a5ce-910e21df07f6": "sold_out",
   "81061073-4508-4b52-87cb-4c3b3337203a": "sold_out",
@@ -129,6 +136,8 @@
   "6bbd2556-2145-40fe-83fa-6d831127248b": "sold_out",
   "97346714-12fe-4e1c-8ab3-c0caa49b6cd7": "sold_out",
   "acf5720a-6f41-4800-975a-2f96dcfcd53b": "sold_out",
+  "d814ce01-3f66-4059-9f5d-6488282a76af": "sold_out",
+  "9b8cbf27-1359-4c3f-80e9-d38ad67bfa8e": "sold_out",
   "61fdc1a4-d205-4b95-ac01-3f80e8a95db9": "sold_out",
   "3c787871-d804-4f72-907e-5341de9c758a": "sold_out",
   "b28a3a8b-cfe2-4f6a-8ff8-b69c22e36353": "sold_out",
@@ -139,6 +148,9 @@
   "__watchlist": [
     "hirono",
     "THE MONSTERS"
+  ],
+  "__nameWatch": [
+    "harry potter"
   ],
   "__seenKeys": [
     "spooky bakehouse series labubu cookie mini bag",
@@ -222,6 +234,11 @@
     "the monsters coca cola series vinyl face blind box",
     "hirono birdy figurine",
     "hirono reshape series figures",
-    "the monsters fall in wild series badge blind box"
+    "the monsters fall in wild series badge blind box",
+    "harry potter owl plush pendant",
+    "mega royal molly 1000 harry potter",
+    "harry potter wizard dynasty",
+    "harry potter pop cube 3 series figures",
+    "harry potter pop cube 2 series figures"
   ]
 }
