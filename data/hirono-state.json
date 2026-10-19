@@ -1,6 +1,4 @@
 {
-  "cb70921c-c34b-480c-9b9d-4f7159af76e6": "in_stock",
-  "a54e4fd5-1224-4581-9520-b7374ed2f4fc": "sold_out",
   "b7a932d5-8e5a-4349-80a3-738f66f590b6": "in_stock",
   "fac3835f-6571-4ab8-aac3-90933896bd15": "in_stock",
   "c9812903-b42f-42a0-a890-d85689d9c7d3": "in_stock",
@@ -135,6 +133,8 @@
   "efad7724-b28b-4821-981d-d66e7d45912b": "in_stock",
   "36e1b2bf-89e3-406f-98a5-58e214c927d7": "sold_out",
   "59a24d8c-621a-4326-b8ae-ad566852ff6d": "sold_out",
+  "cb70921c-c34b-480c-9b9d-4f7159af76e6": "sold_out",
+  "a54e4fd5-1224-4581-9520-b7374ed2f4fc": "sold_out",
   "9666cb41-675d-4424-9245-1d117c7172f3": "sold_out",
   "4c7a4ace-7326-462a-ad19-729f50a45d40": "sold_out",
   "dd49ec25-b173-4459-9a28-605d7f6d58bc": "sold_out",
