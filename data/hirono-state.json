@@ -7,6 +7,8 @@
   "2b890f2c-d0c7-4425-b6d7-e0f39e678d96": "in_stock",
   "e2183459-2227-47ea-9dcf-0e9beb4a152f": "in_stock",
   "95c6287f-3e58-42fa-8399-2af7a84ec9da": "in_stock",
+  "1f1d549f-5f51-45d6-a471-db272744cedc": "sold_out",
+  "3c01ffc1-852b-4362-b2df-a9fed2968f67": "sold_out",
   "14ded1f2-36bf-4711-aedf-b958feac0e97": "in_stock",
   "a77668f7-fd6d-4e94-8a69-6f1afbdf36f4": "in_stock",
   "6397110f-d9a9-4eee-b2fd-152f1f4b37c1": "in_stock",
@@ -142,8 +144,6 @@
   "dd49ec25-b173-4459-9a28-605d7f6d58bc": "sold_out",
   "8a07e23b-762f-4080-89b4-efd744ef2060": "sold_out",
   "28293a66-49cd-4c18-83b9-5f29062ed146": "sold_out",
-  "1f1d549f-5f51-45d6-a471-db272744cedc": "sold_out",
-  "3c01ffc1-852b-4362-b2df-a9fed2968f67": "sold_out",
   "816888ac-eaf7-46aa-8ac7-863006df5929": "sold_out",
   "81061073-4508-4b52-87cb-4c3b3337203a": "sold_out",
   "b0f9961f-df57-4ed1-a5a4-080709c25fde": "sold_out",
@@ -152,6 +152,7 @@
   "88f95448-87c4-4e9b-aa0d-30968220320c": "sold_out",
   "acf5720a-6f41-4800-975a-2f96dcfcd53b": "sold_out",
   "05a4ded3-8f91-4d55-9f70-6f4559b708e3": "sold_out",
+  "18710ed7-bd05-4eba-822e-66245bad209c": "in_stock",
   "1488b9f3-7df1-440a-af35-fb85baf8ff69": "sold_out",
   "fac073df-2757-41b2-b31a-aa4e539df5b0": "sold_out",
   "cde85cd1-1aac-4d76-9e36-08f1c886a4df": "sold_out",
@@ -284,7 +285,8 @@
     "anniversary the ufo chaser hirono journey to the west figure",
     "anniversary the ufo chaser hirono journey to the west figurine",
     "anniversary mega royal molly 100 rouge china",
-    "anniversary dimoo touch the fate a warm companion"
+    "anniversary dimoo touch the fate a warm companion",
+    "hirono floating market figure"
   ],
   "__earlyListed": [
     "harry potter owl plush pendant",
